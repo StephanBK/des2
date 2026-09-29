@@ -1,8 +1,8 @@
 {
-  "name": "park277-desiccant",
-  "version": "1.10.0",
+  "name": "des2",
+  "version": "1.11.0",
   "private": true,
-  "description": "277 Park Avenue: window cavity desiccant life and fog outlook (INOVUES)",
+  "description": "277 Park Avenue: window cavity desiccant life and fog outlook, with U per glass (INOVUES)",
   "type": "module",
   "engines": {
     "node": ">=20"

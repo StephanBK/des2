@@ -70,6 +70,7 @@ export function engineParams(s) {
     // year the page reports.
     max_years: s.lb === 0 ? 2 : FIXED.max_years,
     f_cold: glass.f_cold,
+    u_ip: glass.u_ip,
     al_out: s.seal_out,
     al_in: s.seal_in,
     grams,

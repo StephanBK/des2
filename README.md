@@ -1,4 +1,8 @@
-# 277 Park Avenue: cavity fog outlook
+# 277 Park Avenue: cavity fog outlook (des2)
+
+des2 is a copy of StephanBK/park277-desiccant with one change: each retrofit
+glass sends its own assembly U-value (single pane / SWR 0.352, double pane /
+SWR-IG 0.249, VIG / SWR-VIG 0.164 Btu/hr·ft²·°F) instead of 0.16 for all three.
 
 INOVUES. Owner: Stephan Ketterer, VP of Operations.
 

@@ -1,10 +1,10 @@
-# HANDOVER: 277 Park cavity fog outlook
+# HANDOVER: 277 Park cavity fog outlook (des2: U per glass)
 
-Last session: 2026-09-23 (session 1). State: v1.10.0. Repo
-StephanBK/park277-desiccant (Stephan's personal account, not INOVUES-APPS),
-local clone ~/Documents/park277-desiccant. v1.3.0 deployed on Railway
-(main fdb261f) against the fixed engine (desiccant_life- main c20a557);
-v1.4.0 delivered as a patch.
+Last session: 2026-09-29. State: v1.11.0. Repo StephanBK/des2 (Stephan's
+personal account), a copy of StephanBK/park277-desiccant with full history
+(up to v1.10.0, main ad19a79). des2 is identical to park277-desiccant in
+every aspect except ONE: the assembly U-value is per glass instead of held
+at 0.16. Both apps call the same desiccant_life- engine.
 
 ## Deploy order (matters)
 
@@ -12,10 +12,29 @@ v1.4.0 delivered as a patch.
    the air relaxation fix (main c20a557), both live 2026-09-23. After any
    engine change, RESTART this app's Railway service: it caches results for
    24 h and would keep serving the old numbers.
-2. This repo: Railway service from StephanBK/park277-desiccant, no
-   variables needed.
+2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v1.11.0 (des2, 2026-09-29): U per glass
+
+- Stephan: clone the 277 Park app, identical except U is not constant:
+  0.352 for SWR, 0.249 for SWR-IG, 0.164 for SWR-VIG (Btu/hr.ft2.F,
+  whole assembly). Mapping confirmed: Single pane = SWR, Double pane =
+  SWR-IG, VIG = SWR-VIG. On-screen labels kept identical.
+- shared/scenario.js: u_ip on each GLASSES entry, u_ip removed from FIXED,
+  tooltips show U, assumption text updated. server/engine.js engineParams
+  sends glass.u_ip next to glass.f_cold.
+- Tests 63 -> 65: parity test now pins des2's default request (u_ip 0.164,
+  the only difference from park277-desiccant and desiccant_life-); new test
+  that each glass sends its own U and f; guard test that u_ip never
+  returns to FIXED.
+- Verified against the live engine: echo u_ip 0.352 / 0.249 / 0.164,
+  engine f_warm 0.4094 / 0.2815 / 0.1731 = f_cold + 0.97 x U by hand.
+- Default scenario (8 lb, wet/wet, 70 F / 30 %), U 0.16 -> per glass:
+  single full 256.0 -> 242.2 d, fog 0 -> 0 d/yr; double full 256.1 -> 255.9 d,
+  fog 8 -> 4 d/yr; VIG unchanged (256.2 d, 63 d/yr).
+- Parity with desiccant_life- (Odoo) no longer holds for U by design.
 
 ## v1.10.0: first visible fog follows the working-hours toggle
 
@@ -218,7 +237,7 @@ run" with the detail "engine returned no fog map": by design, not a crash.
 
 - Desorption / cold-capacity: after the engine fix it no longer creates
   fog; kept on. Vendor 3A isotherm at 0 to 10 C would still sharpen it.
-- U per glass from WINDOW when available (shared/scenario.js, one line each,
-  also send it: engineParams currently sends FIXED.u_ip).
+- U per glass: done in des2 v1.11.0 (values from INOVUES, not yet from a
+  WINDOW run per glass).
 - Odoo embed if wanted (the server sets X-Frame-Options SAMEORIGIN and
   frame-ancestors 'self'; loosen both for the Odoo domain).

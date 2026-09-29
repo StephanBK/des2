@@ -56,6 +56,7 @@ test('engine params pin every fixed input and map the controls', () => {
   const p = engineParams({ ...DEFAULTS, glass: 'double', lb: 3, t: 65, rh: 45 })
   for (const [k, v] of Object.entries(FIXED)) if (k !== 'max_years') assert.equal(p[k], v, k)
   assert.equal(p.f_cold, 0.040)
+  assert.equal(p.u_ip, 0.249)
   assert.equal(p.grams, Math.round(3 * GRAMS_PER_LB * 1000) / 1000)
   assert.equal(p.t_in, 65)
   assert.equal(p.rh_in, 45)            // the name the engine actually reads
@@ -163,17 +164,34 @@ test('pounds to grams against independent literal values', () => {
   }
 })
 
-test('parity: the default engine request is pinned (mirrored in desiccant_life- tests/test_parity.py)', () => {
-  // The old simulator (desiccant_life- frontend/src/defaults.json, embedded in
-  // Odoo) starts on exactly this request; its test suite pins the same values.
-  // Change one side only and one of the two suites fails.
+test('parity: the default engine request is pinned (des2: U per glass)', () => {
+  // park277-desiccant and desiccant_life- (the Odoo simulator) pin this same
+  // request with u_ip 0.16. des2 deliberately differs in ONE value only: the
+  // default glass (VIG) sends its own U, 0.164. Everything else is identical.
   assert.deepEqual({ ...engineParams(DEFAULTS) }, {
     address: '277 Park Avenue, New York, NY 10172', orientation: 'north',
-    width_in: 60, height_in: 96, offset_in: 0.6, u_ip: 0.16, r_ip: 0.97,
+    width_in: 60, height_in: 96, offset_in: 0.6, u_ip: 0.164, r_ip: 0.97,
     desiccant: 'ms3a', desorption: true, absorptance: 0.1, floors: 50, window_floor: 25,
     p_occ_pa: 5, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
     sealant_out: 'silicone', sealant_in: 'silicone', max_years: 20,
     f_cold: 0.014, al_out: 'wet_sealed', al_in: 'wet_sealed', grams: 3628.739, t_in: 70, rh_in: 30,
     trace: false, fog_map: true, years_after_full: 1,
   })
+})
+
+test('des2: each glass sends its own U and f (SWR, SWR-IG, SWR-VIG)', () => {
+  const expect = { single: [0.352, 0.068], double: [0.249, 0.040], vig: [0.164, 0.014] }
+  assert.deepEqual(GLASSES.map((g) => g.key).sort(), Object.keys(expect).sort())
+  for (const [glass, [u, f]] of Object.entries(expect)) {
+    for (const lb of [0, 4, 8]) {
+      const p = engineParams({ ...DEFAULTS, glass, lb })
+      assert.equal(p.u_ip, u, `${glass} ${lb} lb U`)
+      assert.equal(p.f_cold, f, `${glass} ${lb} lb f`)
+    }
+  }
+})
+
+test('des2 guard: U is per glass, never fixed', () => {
+  assert.equal('u_ip' in FIXED, false, 'u_ip must not be in FIXED')
+  for (const g of GLASSES) assert.ok(typeof g.u_ip === 'number' && g.u_ip > 0, `${g.key} has a positive u_ip`)
 })

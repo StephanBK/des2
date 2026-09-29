@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '1.10.0'
+export const APP_VERSION = '1.11.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
@@ -12,11 +12,14 @@ export const GRAMS_PER_LB = 453.59237
 
 // Retrofit glass options. f_cold is the temperature factor of the cavity
 // side of the EXISTING pane with that retrofit behind it (WINDOW, used in
-// the 2026-09-16 study). U is held at 0.16 for all three for now.
+// the 2026-09-16 study). u_ip is the whole-assembly U-factor for that glass,
+// Btu/hr.ft2.F (single = SWR, double = SWR-IG, VIG = SWR-VIG), given by
+// INOVUES 2026-09-29. This is the only difference from park277-desiccant,
+// which holds U at 0.16 for all three.
 export const GLASSES = [
-  { key: 'single', label: 'Single pane', f_cold: 0.068, tip: 'Single pane retrofit glass. Cavity-side temperature factor f = 0.068.' },
-  { key: 'double', label: 'Double pane', f_cold: 0.040, tip: 'Double pane retrofit glass. Cavity-side temperature factor f = 0.040.' },
-  { key: 'vig', label: 'VIG', f_cold: 0.014, tip: 'Vacuum insulated glass. Insulates best, so the old pane in front of it runs coldest: f = 0.014.' },
+  { key: 'single', label: 'Single pane', f_cold: 0.068, u_ip: 0.352, tip: 'Single pane retrofit glass (SWR). Cavity-side temperature factor f = 0.068, assembly U = 0.352 Btu/hr·ft²·°F.' },
+  { key: 'double', label: 'Double pane', f_cold: 0.040, u_ip: 0.249, tip: 'Double pane retrofit glass (SWR-IG). Cavity-side temperature factor f = 0.040, assembly U = 0.249 Btu/hr·ft²·°F.' },
+  { key: 'vig', label: 'VIG', f_cold: 0.014, u_ip: 0.164, tip: 'Vacuum insulated glass (SWR-VIG). Insulates best, so the old pane in front of it runs coldest: f = 0.014, assembly U = 0.164 Btu/hr·ft²·°F.' },
 ]
 
 // Seal ladders, tightest first. Keys are the engine's preset keys; the
@@ -53,7 +56,7 @@ export const FIXED = {
   address: '277 Park Avenue, New York, NY 10172',
   orientation: 'north',
   width_in: 60, height_in: 96, offset_in: 0.6,
-  u_ip: 0.16, r_ip: 0.97,
+  r_ip: 0.97,                 // u_ip is per glass (GLASSES), not fixed
   desiccant: 'ms3a',
   desorption: true,
   absorptance: 0.1,
@@ -93,7 +96,7 @@ export const ASSUMPTIONS = [
   '"Wet-sealed" is the ASTM E283 detection floor (0.005 cfm/ft² at 75 Pa), not a measurement of an installed INOVUES seal. A pressure test on an installed cavity would replace it.',
   'With desorption on, the desiccant gives some water back when warm and takes it up again when cold, a small seasonal buffer: slightly less fog after it is full, and a longer life. The engine gives 3A no extra capacity below 25 °C; real 3A holds a few percent more when cold, so the results are on the cautious side here.',
   'After the desiccant is full, the pane fogs about as much as with no desiccant. What decides how much is the real air leakage of the wet seals, which has not been measured on an installed cavity.',
-  'The three glasses differ by their cavity-side temperature factor only; the assembly U-value is held at 0.16 for all three.',
+  'Each glass has its own cavity-side temperature factor and its own assembly U-value: single pane 0.352, double pane 0.249, VIG 0.164 Btu/hr·ft²·°F.',
   '"Desiccant full" means 95 % of its capacity at 25 °C.',
   'The same typical weather year repeats; no climate trend or unusual years.',
 ]
