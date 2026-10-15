@@ -127,7 +127,7 @@ test('report: bad project name is a 400 before any engine call', async (t) => {
   assert.equal(s.f.calls.lifetime, 0)
 })
 
-test('report PDF: a 4-page PDF, downloadable, named after the site and report id', async (t) => {
+test('report PDF: a 3-page PDF, downloadable, named after the site and report id', async (t) => {
   const s = await start(t)
   const r = await s.get(`/api/report?${qs()}&project=Sample`)
   assert.equal(r.status, 200)
@@ -136,5 +136,5 @@ test('report PDF: a 4-page PDF, downloadable, named after the site and report id
   const cd = r.headers['content-disposition']
   assert.match(cd, /^attachment; filename="INOVUES-cavity-assessment-350-Fifth-Avenue-[0-9A-Z]{7}\.pdf"$/)
   const pages = (r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length
-  assert.equal(pages, 4)
+  assert.equal(pages, 3)
 })

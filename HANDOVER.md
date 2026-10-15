@@ -20,6 +20,13 @@ run" with the detail "engine returned no fog map": by design, not a crash.
 
 ## v2.2.0 (2026-10-15): customer report (PDF)
 
+- Later the same day: Stephan had page 4 (method, references, limits,
+  assumptions, reproduce link) taken out. The report is 3 pages now; the
+  page-4 description below is history. Note what left with it: the
+  "not a warranty" line, the typical-year / neighbouring-cell caveat, the
+  unmeasured-seal caveat and the reopen-this-scenario link. The page-1
+  ESTIMATE note for an existing double pane stays.
+
 - Stephan: an export that summarizes the findings for a customer, highly
   polished, with the address and the condensation days, plus anything that
   makes INOVUES more credible. Decisions: PDF built on the server; include

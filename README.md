@@ -10,7 +10,7 @@ U-value (v1.11: SWR 0.352, SWR-IG 0.249, SWR-VIG 0.164 Btu/hr·ft²·°F).
 
 Controls: building address, existing glass (single or double pane),
 retrofit glass, existing window seal, retrofit seal, desiccant pounds, room
-temperature, room humidity. "Customer report" builds a 4-page PDF for the
+temperature, room humidity. "Customer report" builds a 3-page PDF for the
 scenario on screen (v2.2).
 
 Railway variables: `MAPBOX_TOKEN` (optional; turns on address suggestions,

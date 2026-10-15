@@ -2,11 +2,11 @@
 // no browser). Input: the object from report-data.js. Output: a Buffer.
 //
 // Plain JavaScript (no JSX build step on the server): h() is
-// React.createElement. Four Letter pages:
+// React.createElement. Three Letter pages (a 4th, method and limits, was
+// removed at Stephan's request 2026-10-15):
 //   1. summary      site, outlook, three key numbers, configuration
 //   2. calendar     when the pane fogs, by hour and by month; desiccant
 //   3. options      the three retrofit glasses, humidity headroom, climate
-//   4. method       how it works, data, assumptions, limits, reproduce
 //
 // The font has no arrows or comparison signs: text uses words for those.
 
@@ -14,7 +14,7 @@ import { createElement as h } from 'react'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import {
-  Circle, Document, Font, Image, Line, Link, Page, Path, Rect, renderToBuffer, StyleSheet, Svg, Text, View,
+  Circle, Document, Font, Image, Line, Page, Path, Rect, renderToBuffer, StyleSheet, Svg, Text, View,
 } from '@react-pdf/renderer'
 import {
   formatDate, formatDays, formatDuration, HOURS_PER_YEAR, MONTH_SHORT, MONTH_START_DAY, remainingOnDay,
@@ -244,7 +244,7 @@ function SummaryPage({ data }) {
     h(Glance, { data }),
     est ? h(View, { style: { marginTop: 9, backgroundColor: C.amberSoft, borderLeftWidth: 3, borderLeftColor: C.amber, paddingVertical: 4, paddingHorizontal: 8 } },
       h(Text, { style: { fontSize: 7.6, color: C.amberInk } },
-        'ESTIMATE: thermal values for an existing double pane come from a heat-flow model until LBNL WINDOW simulations replace them (page 4).'))
+        'ESTIMATE: thermal values for an existing double pane come from a heat-flow model until LBNL WINDOW simulations replace them.'))
       : null,
     h(Footer, { data }))
 }
@@ -544,60 +544,6 @@ function OptionsPage({ data }) {
     h(Footer, { data }))
 }
 
-// ------------------------------------------------------------ page 4: method
-
-function MethodPage({ data }) {
-  const est = data.config.thermal.estimate || data.options.some((o) => o.thermal.estimate)
-  const steps = [
-    ['Weather', `8,760 hourly values of temperature, humidity, pressure, sun and wind for the site's NREL grid cell (typical meteorological year).`],
-    ['Glass temperature', 'Each hour the cavity side of the existing glass sits at T_out + f × (T_room - T_out), with f from LBNL WINDOW at NFRC 100 winter conditions.'],
-    ['Air exchange', 'Air reaches the cavity through both seals, driven by building pressure (+5 Pa weekdays 7 am to 7 pm), stack and wind. Leakage in cfm/ft² at 75 Pa.'],
-    ['Vapor diffusion', 'Water vapor also diffuses through the silicone sealant beads of both layers, in whichever direction the vapor pressure pushes it.'],
-    ['Desiccant', '3A molecular sieve, fresh at installation on January 1, takes up water along its sorption curve and gives some back when warm.'],
-    ['Condensation', 'Below the cavity air dew point a water film grows on the glass; it evaporates as the glass warms. Fog is visible once the film passes 5 µm.'],
-  ]
-  const refs = [
-    `Weather: NREL National Solar Radiation Database, ${data.site.weather || 'NSRDB'} typical meteorological year, grid cell ${cellText(data.site.weather_cell)}.`,
-    'Glass temperature factors: LBNL WINDOW, NFRC 100 winter conditions (0 °F outside, 70 °F inside).',
-    'Air leakage: ASTM E283 (cfm/ft² at 75 Pa); seal ladder from AERC certified product ratings and ASTM E283 detection limits.',
-    'Temperature-factor method for surface condensation, as in ISO 13788. Psychrometrics: Magnus formula, Sonntag constants.',
-  ]
-  const limits = [
-    'A typical weather year is a composite of real months, not a forecast. Neighboring weather cells can differ noticeably when a scenario is close to the fog threshold.',
-    'Seal leakage values are rated or estimated, not measured on an installed INOVUES cavity. A pressure-decay test on an installed unit would replace them.',
-    ...(est ? ['Thermal values for an existing double pane are estimates until LBNL WINDOW simulations of the exact assembly replace them.'] : []),
-    'Summer heat build-up in the cavity, and its effect on an existing insulating glass unit (thermal stress, edge seal), is not modeled.',
-    'Fog inside an existing double-pane unit, between its own panes, is outside this assessment. A retrofit does not repair a failed unit.',
-    'Results are model predictions for planning and comparison, not a warranty of performance.',
-  ]
-  return h(Page, { size: 'LETTER', style: s.page },
-    h(TopBar, { data, title: 'Method, assumptions and limits' }),
-    h(SectionTitle, { lead: `Hour-by-hour heat and moisture balance of the cavity, from installation until the desiccant is full plus one year (at most ${data.result.max_years} years).` }, 'How the simulation works'),
-    h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 } },
-      ...steps.map(([t, d], i) => h(View, { key: t, style: { width: (CW - 16) / 3, borderWidth: 0.6, borderColor: C.line, borderTopWidth: 2.5, borderTopColor: C.teal, borderRadius: 2, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: C.surface } },
-        h(Text, { style: { fontSize: 7.5, color: C.tealInk, fontWeight: 600, letterSpacing: 0.8 } }, `STEP ${i + 1}`),
-        h(Text, { style: { fontSize: 9.2, fontWeight: 600, marginTop: 1, marginBottom: 3 } }, t),
-        h(Text, { style: { fontSize: 7.6, color: C.ink2, lineHeight: 1.33 } }, d)))),
-
-    h(View, { style: { flexDirection: 'row', gap: 20, marginTop: 14 } },
-      h(View, { style: { flex: 1 } },
-        h(Text, { style: s.h3 }, 'Data and references'),
-        h(Bullets, { size: 7.6, items: refs }),
-        h(Text, { style: { ...s.h3, marginTop: 8 } }, 'Limits of this assessment'),
-        h(Bullets, { size: 7.6, items: limits })),
-      h(View, { style: { flex: 1 } },
-        h(Text, { style: s.h3 }, 'Assumptions behind the numbers'),
-        h(Bullets, { size: 7.6, items: data.config.assumptions }))),
-
-    h(View, { style: { marginTop: 10, borderTopWidth: 0.6, borderTopColor: C.line, paddingTop: 7, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }, wrap: false },
-      h(View, { style: { flex: 1, paddingRight: 16 } },
-        h(Text, { style: { fontSize: 8.2, fontWeight: 600 } }, 'Reproduce this result'),
-        h(Text, { style: { fontSize: 7.4, color: C.ink2, marginTop: 1, lineHeight: 1.3 } },
-          `Report ${data.id}, ${new Date(data.generated_at).toISOString().replace('T', ' ').slice(0, 16)} UTC. Cavity fog outlook ${data.app_version}, simulation engine ${data.engine_version ?? 'n/a'}. The same inputs always give the same report number.`)),
-      h(Link, { src: data.link, style: { fontSize: 8, fontWeight: 600, color: C.tealInk, textDecoration: 'none', marginTop: 9 } }, 'Open this exact scenario online')),
-    h(Footer, { data }))
-}
-
 export async function renderReportPdf(data) {
   registerFonts()
   const doc = h(Document, {
@@ -609,7 +555,6 @@ export async function renderReportPdf(data) {
   },
   h(SummaryPage, { data }),
   h(CalendarPage, { data }),
-  h(OptionsPage, { data }),
-  h(MethodPage, { data }))
+  h(OptionsPage, { data }))
   return renderToBuffer(doc)
 }
