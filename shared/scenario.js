@@ -1,8 +1,8 @@
-// The 277 Park scenario: every control, range and fixed engine input lives
+// The scenario: every control, range and fixed engine input lives
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '1.11.0'
+export const APP_VERSION = '2.0.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
@@ -47,29 +47,32 @@ export const RANGES = {
   rh: { min: 10, max: 60, step: 1 },
 }
 
-export const DEFAULTS = { glass: 'vig', seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 8, t: 70, rh: 30 }
+// The address is free text (v2.0): any building the engine's geocoder and
+// the NREL weather set can reach (the Americas). lat/lon are where the
+// address box's suggestion put it; when present, the engine's own geocode
+// must land within SITE_TOL_DEG of it. The default is only a first-load
+// example.
+export const ADDRESS = { min: 5, max: 200 }
+export const SITE_TOL_DEG = 0.02            // about 2 km, the size of one weather cell
+export const DEFAULT_SITE = { addr: '350 Fifth Avenue, New York, New York 10118, United States', lat: 40.74844, lon: -73.98566 }
+
+export const DEFAULTS = { glass: 'vig', seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 8, t: 70, rh: 30, ...DEFAULT_SITE }
 
 // Every hidden engine input is pinned explicitly (not left to engine
 // defaults), so an engine default change cannot move these results, and
 // every one of them is checked against the engine's echo.
 export const FIXED = {
-  address: '277 Park Avenue, New York, NY 10172',
   orientation: 'north',
   width_in: 60, height_in: 96, offset_in: 0.6,
   r_ip: 0.97,                 // u_ip is per glass (GLASSES), not fixed
   desiccant: 'ms3a',
   desorption: true,
   absorptance: 0.1,
-  floors: 50, window_floor: 25,
+  floors: 20, window_floor: 10,
   p_occ_pa: 5, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
   sealant_out: 'silicone', sealant_in: 'silicone',
   max_years: 20,
 }
-// Where the engine's geocoder must land. "277 Park Avenue, New York, NY"
-// without the ZIP matches 277 Park Avenue in Brooklyn (11205), 7 km away;
-// the server rejects any result whose matched location is not this one.
-// 0.01 deg is about 1.1 km.
-export const EXPECTED_SITE = { zip: '10172', lat: 40.7555, lon: -73.975, tol_deg: 0.01 }
 
 // Whole years simulated after the desiccant fills, so the first winter
 // with a full desiccant is always in the picture.
@@ -82,7 +85,7 @@ export const WORKING_HOURS = { start: 8, end: 18, days: 261, hours: 2610, label:
 
 // Plain-language list of what is fixed, for the assumptions drawer.
 export const FIXED_DESCRIPTION = [
-  ['Building', '277 Park Avenue, New York. North facade, window on floor 25 of 50.'],
+  ['Building', 'North facade, so no sun warms the glass (the cautious case). Window at mid-height of a 20-story building, where the stack effect is close to zero.'],
   ['Window', '60 × 96 in, 0.6 in cavity between the existing pane and the retrofit.'],
   ['Weather', 'Typical meteorological year for the site (NREL NSRDB), repeated every year.'],
   ['Start', 'Installation on January 1 with a fresh desiccant.'],

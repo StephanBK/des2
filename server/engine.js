@@ -1,8 +1,8 @@
 // Talks to the desiccant_life- engine on behalf of the browser.
 //
 // Robustness rules, each tested in test/engine.test.js:
-//   1. The browser may only send the six controls, each whitelisted.
-//   2. Every hidden 277 Park input is added here and pinned explicitly.
+//   1. The browser may only send the controls, each whitelisted.
+//   2. Every hidden input is added here and pinned explicitly.
 //   3. Every input is checked against the engine's echo; a mismatch is an
 //      error, never a silently wrong picture.
 //   4. Network errors and 502/503/504 are retried once; every call has a
@@ -10,7 +10,7 @@
 //   5. An engine without the fog-map API is reported as out of date.
 
 import {
-  EXPECTED_SITE, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT, YEARS_AFTER_FULL,
+  ADDRESS, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, YEARS_AFTER_FULL,
 } from '../shared/scenario.js'
 
 export class HttpError extends Error {
@@ -21,7 +21,7 @@ export class HttpError extends Error {
   }
 }
 
-const CONTROLS = ['glass', 'seal_out', 'seal_in', 'lb', 't', 'rh']
+const CONTROLS = ['glass', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
 
 function intInRange(name, raw, { min, max, step }) {
   if (raw === null || raw === undefined || raw === '') throw new HttpError(400, `Missing ${name}`)
@@ -38,6 +38,35 @@ function oneOf(name, raw, list) {
   return hit.key
 }
 
+/** One line of text: trimmed, inner whitespace collapsed, length-checked. */
+export function cleanAddress(raw) {
+  if (raw === null || raw === undefined) throw new HttpError(400, 'Missing addr (the building address)')
+  // eslint-disable-next-line no-control-regex
+  // Tabs and line breaks (a pasted address) collapse like spaces; other control characters are refused.
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(raw)) throw new HttpError(400, 'addr must be plain text')
+  const v = String(raw).replace(/\s+/g, ' ').trim()
+  if (v.length < ADDRESS.min) throw new HttpError(400, `addr is too short: give a street address, city and state`)
+  if (v.length > ADDRESS.max) throw new HttpError(400, `addr must be at most ${ADDRESS.max} characters`)
+  return v
+}
+
+function coord(name, raw, limit) {
+  if (!/^-?\d{1,3}(\.\d{1,12})?$/.test(raw)) throw new HttpError(400, `${name} must be a number in degrees, got "${raw}"`)
+  const v = Number(raw)
+  if (Math.abs(v) > limit) throw new HttpError(400, `${name} must be between -${limit} and ${limit}`)
+  return Math.round(v * 1e5) / 1e5
+}
+
+/** lat and lon come as a pair or not at all. */
+function site(params) {
+  const la = params.get('lat')
+  const lo = params.get('lon')
+  const has = (x) => x !== null && x !== ''
+  if (!has(la) && !has(lo)) return { lat: null, lon: null }
+  if (!has(la) || !has(lo)) throw new HttpError(400, 'lat and lon must be sent together')
+  return { lat: coord('lat', la, 90), lon: coord('lon', lo, 180) }
+}
+
 /** URLSearchParams from the browser -> validated scenario. */
 export function parseScenario(params) {
   for (const k of params.keys()) {
@@ -50,12 +79,14 @@ export function parseScenario(params) {
     lb: intInRange('lb', params.get('lb'), RANGES.lb),
     t: intInRange('t', params.get('t'), RANGES.t),
     rh: intInRange('rh', params.get('rh'), RANGES.rh),
+    addr: cleanAddress(params.get('addr')),
+    ...site(params),
   }
 }
 
 /** Canonical cache key: same scenario, same key, whatever the query order. */
 export function scenarioKey(s) {
-  return CONTROLS.map((k) => `${k}=${s[k]}`).join('&')
+  return CONTROLS.map((k) => `${k}=${k === 'addr' ? s[k].toLowerCase() : s[k]}`).join('&')
 }
 
 /** Full engine query for a scenario. */
@@ -63,6 +94,7 @@ export function engineParams(s) {
   const glass = GLASSES.find((g) => g.key === s.glass)
   const grams = Math.round(s.lb * GRAMS_PER_LB * 1000) / 1000
   return {
+    address: s.addr,
     ...FIXED,
     // Without desiccant nothing ever fills, so the engine would play all
     // max_years years. Two are enough: year 1 starts from a clean pane and
@@ -117,9 +149,10 @@ function same(a, b) {
 /**
  * Compare what was sent with what the engine says it used. `presets` maps
  * seal keys to cfm/ft2 ({ al_out: {key: value}, al_in: {...} }); seal keys
- * are sent as names and echoed as numbers.
+ * are sent as names and echoed as numbers. `picked` is where the address
+ * box put the address ({ lat, lon }, or nulls when it was typed freehand).
  */
-export function echoMismatches(sent, payload, presets) {
+export function echoMismatches(sent, payload, presets, picked = { lat: null, lon: null }) {
   const echo = payload && payload.inputs
   if (!echo) return ['engine response has no input echo']
   const out = []
@@ -136,18 +169,39 @@ export function echoMismatches(sent, payload, presets) {
     if (!same(expected, got)) out.push(`${k}: sent ${JSON.stringify(expected)}, engine used ${JSON.stringify(got)}`)
   }
   // The echo proves the engine received the address; this proves its
-  // geocoder found the right building.
+  // geocoder found the same place the address box showed the user.
   const loc = payload.location
   if (!loc || typeof loc.lat !== 'number' || typeof loc.lon !== 'number') out.push('location: engine returned no geocoded location')
-  else {
-    const far = Math.abs(loc.lat - EXPECTED_SITE.lat) > EXPECTED_SITE.tol_deg || Math.abs(loc.lon - EXPECTED_SITE.lon) > EXPECTED_SITE.tol_deg
-    const zip = String(loc.matched_address || '').includes(EXPECTED_SITE.zip)
-    if (far || !zip) out.push(`location: engine matched "${loc.matched_address}" (${loc.lat}, ${loc.lon}), not 277 Park Avenue ${EXPECTED_SITE.zip}`)
+  else if (picked.lat !== null && picked.lon !== null) {
+    const far = Math.abs(loc.lat - picked.lat) > SITE_TOL_DEG || Math.abs(loc.lon - picked.lon) > SITE_TOL_DEG
+    if (far) out.push(`location: engine matched "${loc.matched_address}" (${loc.lat}, ${loc.lon}), not the picked address at (${picked.lat}, ${picked.lon})`)
   }
   const fog = payload.fog
   if (!fog || !Array.isArray(fog.years)) out.push('engine returned no fog map (engine predates the 2026-09-23 fog-map API)')
   else if (fog.years_after_full !== sent.years_after_full) out.push(`years_after_full: sent ${sent.years_after_full}, engine used ${fog.years_after_full}`)
   return out
+}
+
+const cToF = (c) => (c * 9) / 5 + 32
+const r1 = (x) => Math.round(x * 10) / 10
+
+/**
+ * Site climate from the engine's weather summary and its daily mean
+ * outdoor temperatures (first 365 days = one typical year). Heating degree
+ * days use the US 65 F base: HDD = sum over days of max(0, 65 - daily mean).
+ */
+export function climateOf(payload) {
+  const w = payload.weather || {}
+  const days = payload.daily?.t_out_f?.slice(0, 365) ?? []
+  const has = (x) => typeof x === 'number'
+  return {
+    coldest_f: has(w.t_out_c_min) ? r1(cToF(w.t_out_c_min)) : null,
+    warmest_f: has(w.t_out_c_max) ? r1(cToF(w.t_out_c_max)) : null,
+    mean_f: has(w.t_out_c_mean) ? r1(cToF(w.t_out_c_mean)) : null,
+    hdd65: days.length === 365 ? Math.round(days.reduce((s, d) => s + Math.max(0, 65 - d), 0)) : null,
+    freezing_days: days.length === 365 ? days.filter((d) => d < 32).length : null,
+    elevation_m: has(w.elevation_m) ? w.elevation_m : null,
+  }
 }
 
 /** Keep only what the page draws. */
@@ -180,6 +234,9 @@ export function trimPayload(payload, scenario, sent) {
       weather: payload.weather?.source || payload.weather?.label || null,
       site: payload.location?.matched_address ?? null,
       weather_cell: payload.weather ? [payload.weather.grid_lat, payload.weather.grid_lon] : null,
+      station_id: payload.weather?.station_id ?? null,
+      location: payload.location ? { lat: payload.location.lat, lon: payload.location.lon } : null,
+      climate: climateOf(payload),
     },
   }
 }
@@ -251,7 +308,7 @@ export function createEngineClient({
     const r = await getWithRetry(`${base}/api/lifetime?${toQuery(sent)}`, opts)
     if (r.status === 400) throw new HttpError(502, 'The simulation engine rejected the request', r.body?.error || r.body)
     if (r.status !== 200 || !r.body) throw new HttpError(502, `The simulation engine answered ${r.status}`, r.body?.error || r.body)
-    const bad = echoMismatches(sent, r.body, p)
+    const bad = echoMismatches(sent, r.body, p, { lat: scenario.lat ?? null, lon: scenario.lon ?? null })
     if (bad.length) throw new HttpError(502, 'The simulation engine used different inputs than requested, so the result is withheld', bad)
     return trimPayload(r.body, scenario, sent)
   }

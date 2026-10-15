@@ -79,7 +79,7 @@ export function dryChip(r) {
   return `Dry for ${formatDays(r.full_hour)}`
 }
 
-export default function Cavity({ scenario, sealRanks, result, busy, dewF, glassLabel, working = false }) {
+export default function Cavity({ scenario, sealRanks, result, busy, dewF, glassLabel, working = false, place = '' }) {
   const build = BUILD[scenario.glass]
   const retroEnd = RETRO_X + build.panes[build.panes.length - 1][1]
   const frameL = PANE_X - 12
@@ -124,7 +124,7 @@ export default function Cavity({ scenario, sealRanks, result, busy, dewF, glassL
 
         {/* zone text */}
         <text className="zone" x="20" y="24">Outside</text>
-        <text className="zone-sub" x="20" y="42">New York, typical year</text>
+        <text className="zone-sub" x="20" y="42">{place ? `${place.length > 24 ? `${place.slice(0, 23)}…` : place}, typical year` : 'Typical year'}</text>
         <text className="zone" x={(cavL + cavR) / 2} y="20" textAnchor="middle">Cavity, 0.6 in</text>
         <text className="zone" x={W - 20} y="24" textAnchor="end">Room</text>
         <text className="room-t" x={W - 20} y="190" textAnchor="end">{scenario.t} °F</text>

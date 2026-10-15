@@ -23,7 +23,7 @@ export default function Assumptions({ open, onClose, engineVersion }) {
           <button type="button" className="close" onClick={onClose} aria-label="Close assumptions">Close</button>
         </div>
 
-        <h3>Fixed for 277 Park</h3>
+        <h3>Fixed in this tool</h3>
         <dl className="fixed">
           {FIXED_DESCRIPTION.map(([k, v]) => (
             <div key={k}><dt>{k}</dt><dd>{v}</dd></div>

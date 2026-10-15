@@ -1,22 +1,27 @@
-# 277 Park Avenue: cavity fog outlook (des2)
-
-des2 is a copy of StephanBK/park277-desiccant with one change: each retrofit
-glass sends its own assembly U-value (single pane / SWR 0.352, double pane /
-SWR-IG 0.249, VIG / SWR-VIG 0.164 Btu/hr·ft²·°F) instead of 0.16 for all three.
+# Cavity fog outlook (des2)
 
 INOVUES. Owner: Stephan Ketterer, VP of Operations.
 
-A stakeholder-facing page for 277 Park Avenue. Six controls (retrofit glass,
-existing window seal, retrofit seal, desiccant pounds, room temperature, room
-humidity) and one answer: how long the desiccant keeps the window cavity dry,
-and on which days and hours the pane fogs afterwards.
+For any building address (v2.0): how long the desiccant keeps a secondary
+window retrofit cavity dry, and on which days and hours the pane fogs.
+Started as a copy of StephanBK/park277-desiccant; differences: any address
+with autocomplete (v2.0), and each retrofit glass sends its own assembly
+U-value (v1.11: SWR 0.352, SWR-IG 0.249, SWR-VIG 0.164 Btu/hr·ft²·°F).
+
+Controls: building address, retrofit glass, existing window seal, retrofit
+seal, desiccant pounds, room temperature, room humidity.
+
+Railway variables: `MAPBOX_TOKEN` (optional; turns on address suggestions,
+same publishable token as the engine's), `ENGINE_URL` (optional).
 
 ## How it works
 
 ```
 browser  ->  this app (server/)  ->  desiccant_life- engine (Railway)
-             validates 6 controls     hour-by-hour physics
-             adds fixed 277 Park inputs
+             validates the controls   hour-by-hour physics
+             adds the fixed inputs    geocodes the address (Mapbox)
+             asks Mapbox for          downloads the NREL weather year
+             address suggestions
              checks the engine's echo of every input
              caches results
 ```

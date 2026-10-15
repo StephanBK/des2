@@ -27,6 +27,13 @@ const RENAME = { t_in: 't_in_f', rh_in: 'rh_in_pct' }
 const BOOL = new Set(['desorption', 'weekdays_only'])
 const STRING = new Set(['address', 'orientation', 'desiccant', 'sealant_out', 'sealant_in'])
 
+// Where the fake geocoder puts known addresses; anything else lands at the
+// first entry, like a real geocoder that matched something.
+export const PLACES = {
+  '350 Fifth Avenue, New York, New York 10118, United States': { lat: 40.74843, lon: -73.985667 },
+  '233 South Wacker Drive, Chicago, Illinois 60606, United States': { lat: 41.878687, lon: -87.635955 },
+}
+
 function lifetimePayload(q, opts) {
   const inputs = {}
   for (const [k, v] of q.entries()) {
@@ -43,17 +50,27 @@ function lifetimePayload(q, opts) {
   const payload = {
     version: '0.1.0',
     inputs,
-    weather: { source: 'NSRDB TMY (fake)' },
+    weather: {
+      source: 'NSRDB TMY (fake)', grid_lat: 40.73, grid_lon: -73.98, station_id: '1', elevation_m: 10,
+      t_out_c_min: -10, t_out_c_max: 35, t_out_c_mean: 12.5,
+    },
     headline: {
       exhausted_hour: 3940, first_visible_hour: 8760 + 8000, capped: false,
       hours_run: years * 8760, years_run: years,
     },
     years: Array.from({ length: years }, (_, i) => ({ year: i + 1, hours_visible: i === years - 1 ? 760 : 0 })),
-    daily: { loading: Array.from({ length: years * 365 }, (_, d) => Math.min(0.21, d * 0.002)) },
+    daily: {
+      loading: Array.from({ length: years * 365 }, (_, d) => Math.min(0.21, d * 0.002)),
+      // 100 days at 25 F, 265 days at 70 F, repeated each year
+      t_out_f: Array.from({ length: years * 365 }, (_, d) => (d % 365 < 100 ? 25 : 70)),
+    },
     q_max_25: 0.21,
-    location: opts.brooklyn
-      ? { lat: 40.69609, lon: -73.96724, matched_address: '277 Park Avenue, Brooklyn, New York 11205, United States' }
-      : { lat: 40.755535, lon: -73.97495, matched_address: '277 Park Avenue, New York, New York 10172, United States' },
+    location: (() => {
+      const addr = q.get('address')
+      const hit = PLACES[addr] || Object.values(PLACES)[0]
+      const shift = opts.far ? 0.5 : 0
+      return { lat: hit.lat + shift, lon: hit.lon, matched_address: PLACES[addr] ? addr : Object.keys(PLACES)[0], query: addr }
+    })(),
   }
   if (q.get('fog_map') === 'true' && !opts.noFog) {
     payload.fog = {
@@ -76,7 +93,7 @@ function response(status, body) {
  *   failFirst: n       first n lifetime calls answer 503
  *   down: true         every call throws (network error)
  *   hang: true         lifetime calls never answer (until aborted)
- *   brooklyn: true     geocoder lands on 277 Park Avenue, Brooklyn
+ *   far: true          geocoder lands 0.5 deg (55 km) north of the address
  */
 export function fakeEngine(opts = {}) {
   const calls = { presets: 0, lifetime: 0, urls: [] }

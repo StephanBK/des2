@@ -1,8 +1,8 @@
 // The page's side of /api/run and /api/config.
 
-import { DEFAULTS, GLASSES, RANGES, SEALS_EXISTING, SEALS_RETROFIT } from '../../shared/scenario.js'
+import { ADDRESS, DEFAULTS, GLASSES, RANGES, SEALS_EXISTING, SEALS_RETROFIT } from '../../shared/scenario.js'
 
-const ORDER = ['glass', 'seal_out', 'seal_in', 'lb', 't', 'rh']
+const ORDER = ['glass', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
 
 export class ApiError extends Error {
   constructor(message, status, detail) {
@@ -12,8 +12,9 @@ export class ApiError extends Error {
   }
 }
 
+// lat/lon are left out when the address was typed rather than picked.
 export function queryOf(s) {
-  return new URLSearchParams(ORDER.map((k) => [k, String(s[k])])).toString()
+  return new URLSearchParams(ORDER.filter((k) => s[k] !== null && s[k] !== undefined).map((k) => [k, String(s[k])])).toString()
 }
 
 // Recent results, so flipping back to a scenario is instant. Results never
@@ -45,6 +46,14 @@ export async function runScenario(s, signal) {
   return body
 }
 
+export async function fetchSuggestions(q, signal) {
+  const res = await fetch(`/api/suggest?q=${encodeURIComponent(q)}`, { signal })
+  let body = null
+  try { body = await res.json() } catch { body = null }
+  if (!res.ok) throw new ApiError(body?.error || `Suggestions answered ${res.status}`, res.status)
+  return body?.suggestions ?? []
+}
+
 export async function fetchConfig() {
   const res = await fetch('/api/config')
   if (!res.ok) throw new ApiError(`Config answered ${res.status}`, res.status)
@@ -63,6 +72,21 @@ function num(raw, { min, max, step }, fallback) {
   return v >= min && v <= max && (v - min) % step === 0 ? v : fallback
 }
 
+function coord(raw, limit) {
+  if (raw === null || !/^-?\d{1,3}(\.\d{1,12})?$/.test(raw)) return null
+  const v = Number(raw)
+  return Math.abs(v) <= limit ? Math.round(v * 1e5) / 1e5 : null
+}
+
+/** Address (and where it was picked) from the address bar; the default site when absent. */
+function urlSite(p) {
+  const addr = (p.get('addr') || '').replace(/\s+/g, ' ').trim()
+  if (addr.length < ADDRESS.min || addr.length > ADDRESS.max) return { addr: DEFAULTS.addr, lat: DEFAULTS.lat, lon: DEFAULTS.lon }
+  const lat = coord(p.get('lat'), 90)
+  const lon = coord(p.get('lon'), 180)
+  return lat !== null && lon !== null ? { addr, lat, lon } : { addr, lat: null, lon: null }
+}
+
 /** Scenario from the address bar; anything invalid falls back to the default. */
 export function readUrlScenario(search = window.location.search) {
   const p = new URLSearchParams(search)
@@ -73,6 +97,7 @@ export function readUrlScenario(search = window.location.search) {
     lb: num(p.get('lb'), RANGES.lb, DEFAULTS.lb),
     t: num(p.get('t'), RANGES.t, DEFAULTS.t),
     rh: num(p.get('rh'), RANGES.rh, DEFAULTS.rh),
+    ...urlSite(p),
   }
 }
 

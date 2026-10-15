@@ -1,7 +1,8 @@
-// 277 Park desiccant and fog outlook: web server.
+// Cavity fog outlook (des2): web server.
 //
-// Serves the built page from dist/ and three API routes:
-//   GET /api/run?glass=&seal_out=&seal_in=&lb=&t=&rh=   one simulation
+// Serves the built page from dist/ and these API routes:
+//   GET /api/run?glass=&seal_out=&seal_in=&lb=&t=&rh=&addr=[&lat=&lon=]   one simulation
+//   GET /api/suggest?q=                                 address suggestions (Mapbox)
 //   GET /api/config                                     controls + preset values
 //   GET /health                                         always 200 while the app runs
 //   GET /health/engine                                  engine reachability
@@ -16,6 +17,7 @@ import { gzipSync } from 'node:zlib'
 
 import { coalescer, LruCache } from './cache.js'
 import { createEngineClient, HttpError, parseScenario, scenarioKey } from './engine.js'
+import { createSuggester } from './suggest.js'
 import {
   APP_VERSION, ASSUMPTIONS, DEFAULTS, ENGINE_DEFAULT_URL, FIXED_DESCRIPTION, GLASSES, RANGES,
   SEALS_EXISTING, SEALS_RETROFIT,
@@ -60,6 +62,7 @@ export function createApp({
   distDir = resolve(HERE, '..', 'dist'),
   engine = createEngineClient({ baseUrl: engineUrl }),
   cache = new LruCache({ max: 500 }),
+  suggester = createSuggester(),
   log = (...a) => console.log(new Date().toISOString(), ...a),
 } = {}) {
   const once = coalescer()
@@ -80,6 +83,11 @@ export function createApp({
     sendJson(req, res, 200, { ...out, cached: false, ms: Date.now() - t0 })
   }
 
+  async function suggestRoute(req, res, url) {
+    const suggestions = await suggester.suggest(url.searchParams.get('q'))
+    sendJson(req, res, 200, { suggestions })
+  }
+
   async function configRoute(req, res) {
     let presets = null
     let presetsError = null
@@ -96,6 +104,7 @@ export function createApp({
       assumptions: ASSUMPTIONS,
       engine_version: presets?.version ?? null,
       presets_error: presetsError,
+      suggest: suggester.available,
     })
   }
 
@@ -124,6 +133,7 @@ export function createApp({
       if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(req, res, 405, { error: 'Method not allowed' }, { allow: 'GET, HEAD' })
       if (url.pathname === '/api/run') return await runRoute(req, res, url)
       if (url.pathname === '/api/config') return await configRoute(req, res)
+      if (url.pathname === '/api/suggest') return await suggestRoute(req, res, url)
       if (url.pathname === '/health') return sendJson(req, res, 200, { ok: true, version: APP_VERSION, cached_results: cache.size })
       if (url.pathname === '/health/engine') {
         try { const p = await engine.presets(); return sendJson(req, res, 200, { ok: true, engine_version: p.version }) }
@@ -144,5 +154,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const port = Number(process.env.PORT) || 3000
   const app = createApp()
   app.requestTimeout = 180_000
-  app.listen(port, () => console.log(`277 Park fog outlook on :${port}, engine ${process.env.ENGINE_URL || ENGINE_DEFAULT_URL}`))
+  app.listen(port, () => console.log(`Cavity fog outlook on :${port}, engine ${process.env.ENGINE_URL || ENGINE_DEFAULT_URL}, address suggestions ${process.env.MAPBOX_TOKEN ? 'on' : 'off (no MAPBOX_TOKEN)'}`))
 }

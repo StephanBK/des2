@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GLASSES, SEALS_EXISTING, SEALS_RETROFIT, WORKING_HOURS } from '../../shared/scenario.js'
-import { headlineCards, summarize } from '../../shared/story.js'
+import { headlineCards, placeName, summarize } from '../../shared/story.js'
+import AddressBox from './AddressBox.jsx'
 import { fetchConfig, peek, queryOf, readUrlHours, readUrlScenario, runScenario, writeUrlScenario } from './api.js'
 import Assumptions from './Assumptions.jsx'
 import Cavity from './Cavity.jsx'
@@ -21,6 +22,26 @@ function ErrorPanel({ error, onRetry }) {
       )}
       <button type="button" className="primary" onClick={onRetry}>Try again</button>
     </div>
+  )
+}
+
+// What the engine found for the address: the matched address when it differs
+// from what was typed, and the weather data behind the numbers.
+function SiteFacts({ data, scenario, busy }) {
+  const e = data?.engine
+  // Facts belong to the result on screen; a new address shows nothing old.
+  const current = data?.scenario?.addr === scenario.addr
+  if (busy && !current) return <p className="site-facts"><span>Finding the address and its weather…</span></p>
+  if (!e || !current) return <p className="site-facts" aria-hidden="true">&nbsp;</p>
+  const typed = scenario.lat === null
+  const cell = e.weather_cell && e.weather_cell.every((x) => typeof x === 'number')
+    ? `${Math.abs(e.weather_cell[0]).toFixed(2)}° ${e.weather_cell[0] >= 0 ? 'N' : 'S'}, ${Math.abs(e.weather_cell[1]).toFixed(2)}° ${e.weather_cell[1] >= 0 ? 'E' : 'W'}`
+    : null
+  return (
+    <p className="site-facts">
+      {typed && e.site && <span>Matched: <strong>{e.site}</strong></span>}
+      <span>Weather: typical year, NREL {e.weather || 'NSRDB'}{cell ? `, grid cell ${cell}` : ''}</span>
+    </p>
   )
 }
 
@@ -78,11 +99,19 @@ export default function App() {
           <img className="word" src="/inovues-wordmark.png" alt="INOVUES" width="118" height="23" />
         </div>
         <div className="title">
-          <h1>277 Park Avenue</h1>
-          <p>Window cavity: how long the desiccant lasts, and when the pane fogs</p>
+          <h1>Cavity fog outlook</h1>
+          <p>Secondary window retrofit: how long the desiccant lasts, and when the pane fogs</p>
         </div>
         <button type="button" className="ghost" onClick={() => setDrawer(true)}>Assumptions</button>
       </header>
+
+      <section className="sitebar" aria-label="Site">
+        <div className="sitebar-in">
+          <AddressBox value={scenario.addr} suggestOn={config ? config.suggest : undefined}
+            onPick={(site) => update(site)} />
+          <SiteFacts data={error ? null : data} scenario={scenario} busy={busy} />
+        </div>
+      </section>
 
       <main className="page" aria-busy={busy}>
         <div className="progress" aria-hidden="true" data-on={busy ? '1' : '0'} />
@@ -115,6 +144,7 @@ export default function App() {
 
           <div className="center">
             <Cavity scenario={scenario} sealRanks={ranks} result={r} busy={busy} glassLabel={glassLabel} working={workingView}
+              place={placeName(data?.engine?.site || scenario.addr)}
               dewF={dewPointF(scenario.t, scenario.rh)} />
             <div className="under">
               <GlassPicker value={scenario.glass} onPick={(k) => update({ glass: k })} />

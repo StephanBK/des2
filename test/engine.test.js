@@ -2,9 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  createEngineClient, ECHO_EXEMPT, ECHO_KEYS, engineParams, HttpError, parseScenario, scenarioKey,
+  climateOf, createEngineClient, ECHO_EXEMPT, ECHO_KEYS, engineParams, HttpError, parseScenario, scenarioKey,
 } from '../server/engine.js'
-import { DEFAULTS, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT } from '../shared/scenario.js'
+import { ADDRESS, DEFAULTS, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT } from '../shared/scenario.js'
 import { fakeEngine } from './fake-engine.js'
 
 const q = (o) => new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]))
@@ -44,6 +44,35 @@ test('out of range, fractional, missing and unknown inputs are rejected with 400
   assert.throws(() => parseScenario(q(noLb)), (e) => e.status === 400)
 })
 
+test('address: whitespace collapses, length and plain text are enforced', () => {
+  assert.equal(parseScenario(q({ ...DEFAULTS, addr: '  233  South Wacker Drive,\tChicago ' })).addr, '233 South Wacker Drive, Chicago')
+  assert.equal(parseScenario(q({ ...DEFAULTS, addr: '350 Fifth Avenue\r\nNew York, NY' })).addr, '350 Fifth Avenue New York, NY')
+  const bad = ['abc', 'x'.repeat(ADDRESS.max + 1), 'bell\u0007 street 12', '   ']
+  for (const addr of bad) assert.throws(() => parseScenario(q({ ...DEFAULTS, addr })), (e) => e.status === 400, JSON.stringify(addr))
+  const { addr, ...noAddr } = DEFAULTS
+  assert.throws(() => parseScenario(q(noAddr)), (e) => e.status === 400 && /addr/.test(e.message))
+})
+
+test('lat and lon: a pair or nothing, in range, rounded to 5 decimals', () => {
+  const { lat, lon, ...typed } = DEFAULTS
+  const s = parseScenario(q(typed))
+  assert.equal(s.lat, null)
+  assert.equal(s.lon, null)
+  assert.equal(parseScenario(q({ ...DEFAULTS, lat: '41.8786871234', lon: '-87.6359559' })).lat, 41.87869)
+  for (const b of [{ lat: 41 }, { lon: -87 }].map(({ lat: la, lon: lo }) => ({ ...typed, ...(la ? { lat: la } : { lon: lo }) }))) {
+    assert.throws(() => parseScenario(q(b)), (e) => e.status === 400 && /together/.test(e.message))
+  }
+  for (const b of [{ lat: 91, lon: 0 }, { lat: 0, lon: 181 }, { lat: 'north', lon: 0 }]) {
+    assert.throws(() => parseScenario(q({ ...typed, ...b })), (e) => e.status === 400, JSON.stringify(b))
+  }
+})
+
+test('cache key ignores address case', () => {
+  const a = parseScenario(q(DEFAULTS))
+  const b = parseScenario(q({ ...DEFAULTS, addr: DEFAULTS.addr.toUpperCase() }))
+  assert.equal(scenarioKey(a), scenarioKey(b))
+})
+
 test('cache key ignores parameter order', () => {
   const a = parseScenario(q(DEFAULTS))
   const b = parseScenario(new URLSearchParams(Object.entries(DEFAULTS).reverse().map(([k, v]) => [k, String(v)])))
@@ -55,6 +84,8 @@ test('cache key ignores parameter order', () => {
 test('engine params pin every fixed input and map the controls', () => {
   const p = engineParams({ ...DEFAULTS, glass: 'double', lb: 3, t: 65, rh: 45 })
   for (const [k, v] of Object.entries(FIXED)) if (k !== 'max_years') assert.equal(p[k], v, k)
+  assert.equal(p.address, DEFAULTS.addr)
+  assert.equal('addr' in p || 'lat' in p || 'lon' in p, false, 'address box fields never reach the engine')
   assert.equal(p.f_cold, 0.040)
   assert.equal(p.u_ip, 0.249)
   assert.equal(p.grams, Math.round(3 * GRAMS_PER_LB * 1000) / 1000)
@@ -145,15 +176,35 @@ test('the engine URL gets exactly the parameters built here', async () => {
   assert.equal(u.searchParams.get('al_out'), 'wet_sealed')
 })
 
-test('a geocode to the wrong building (Brooklyn) is rejected', async () => {
-  const { c } = client({ brooklyn: true })
-  await assert.rejects(c.run(DEFAULTS), (e) => e.status === 502 && e.detail.some((d) => d.startsWith('location') && d.includes('Brooklyn')))
+test('a geocode far from the picked address is rejected', async () => {
+  const { c } = client({ far: true })
+  await assert.rejects(c.run(DEFAULTS), (e) => e.status === 502 && e.detail.some((d) => d.startsWith('location') && d.includes('not the picked address')))
 })
 
-test('the matched site is reported with the result', async () => {
+test('a typed address (no pick) is accepted wherever the engine lands, and the match is reported', async () => {
+  const { c } = client({ far: true })
+  const { lat, lon, ...typed } = DEFAULTS
+  const out = await c.run({ ...typed, addr: '233 South Wacker Drive, Chicago, Illinois 60606, United States', lat: null, lon: null })
+  assert.match(out.engine.site, /Chicago/)
+  assert.ok(out.engine.location.lat > 42, 'reports where the engine actually landed')
+})
+
+test('the matched site, location and weather cell are reported with the result', async () => {
   const { c } = client()
   const out = await c.run(DEFAULTS)
-  assert.match(out.engine.site, /10172/)
+  assert.match(out.engine.site, /10118/)
+  assert.deepEqual(out.engine.location, { lat: 40.74843, lon: -73.985667 })
+  assert.deepEqual(out.engine.weather_cell, [40.73, -73.98])
+})
+
+test('site climate: heating degree days and freezing days from daily means, extremes in F', () => {
+  // 100 days at 25 F (HDD 40 each) + 265 days at 70 F (HDD 0) = 4,000
+  const c = climateOf({
+    weather: { t_out_c_min: -10, t_out_c_max: 35, t_out_c_mean: 12.5, elevation_m: 10 },
+    daily: { t_out_f: [...Array(100).fill(25), ...Array(265).fill(70), ...Array(365).fill(0)] },
+  })
+  assert.deepEqual(c, { coldest_f: 14, warmest_f: 95, mean_f: 54.5, hdd65: 4000, freezing_days: 100, elevation_m: 10 })
+  assert.deepEqual(climateOf({}), { coldest_f: null, warmest_f: null, mean_f: null, hdd65: null, freezing_days: null, elevation_m: null })
 })
 
 test('pounds to grams against independent literal values', () => {
@@ -164,14 +215,16 @@ test('pounds to grams against independent literal values', () => {
   }
 })
 
-test('parity: the default engine request is pinned (des2: U per glass)', () => {
-  // park277-desiccant and desiccant_life- (the Odoo simulator) pin this same
-  // request with u_ip 0.16. des2 deliberately differs in ONE value only: the
-  // default glass (VIG) sends its own U, 0.164. Everything else is identical.
+test('the default engine request is pinned', () => {
+  // v2.0 (universal): compared with park277-desiccant and desiccant_life-
+  // (the Odoo simulator) this request differs in the address (any building
+  // now), the building height (20 floors, window on 10: still mid-height,
+  // where the stack effect is near zero, so results match 50/25; checked
+  // against the live engine 2026-10-15) and the per-glass U (v1.11).
   assert.deepEqual({ ...engineParams(DEFAULTS) }, {
-    address: '277 Park Avenue, New York, NY 10172', orientation: 'north',
+    address: '350 Fifth Avenue, New York, New York 10118, United States', orientation: 'north',
     width_in: 60, height_in: 96, offset_in: 0.6, u_ip: 0.164, r_ip: 0.97,
-    desiccant: 'ms3a', desorption: true, absorptance: 0.1, floors: 50, window_floor: 25,
+    desiccant: 'ms3a', desorption: true, absorptance: 0.1, floors: 20, window_floor: 10,
     p_occ_pa: 5, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
     sealant_out: 'silicone', sealant_in: 'silicone', max_years: 20,
     f_cold: 0.014, al_out: 'wet_sealed', al_in: 'wet_sealed', grams: 3628.739, t_in: 70, rh_in: 30,

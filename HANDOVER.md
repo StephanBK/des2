@@ -1,6 +1,7 @@
-# HANDOVER: 277 Park cavity fog outlook (des2: U per glass)
+# HANDOVER: cavity fog outlook (des2)
 
-Last session: 2026-09-29. State: v1.11.0. Repo StephanBK/des2 (Stephan's
+Last session: 2026-10-15. State: v2.0.0 (any address). Before that:
+2026-09-29, v1.11.0. Repo StephanBK/des2 (Stephan's
 personal account), a copy of StephanBK/park277-desiccant with full history
 (up to v1.10.0, main ad19a79). des2 is identical to park277-desiccant in
 every aspect except ONE: the assembly U-value is per glass instead of held
@@ -15,6 +16,34 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.0.0 (2026-10-15): any address, with autocomplete
+
+- Stephan: make the app universal, not 277 Park: an address box with
+  autocomplete, the weather pulled for that site. (Next in the same
+  session: existing double-pane option, customer PDF report.)
+- Address box (web/src/AddressBox.jsx): suggestions from /api/suggest, a
+  server proxy to Mapbox Geocoding v6 forward (server/suggest.js), the same
+  API the engine geocodes with. Countries us,ca,mx,pr (NREL weather covers
+  the Americas). Needs Railway variable MAPBOX_TOKEN on des2; without it the
+  box still runs a typed address and shows what the engine matched.
+- URL carries addr (+ lat/lon when picked). Server: addr cleaned (whitespace
+  collapsed, 5 to 200 characters, no control characters); lat/lon a pair,
+  rounded to 5 decimals. The engine's geocode must land within 0.02 deg of
+  the picked point, else 502 (replaces the 277 Park ZIP check). Typed
+  addresses run wherever the engine lands; the page shows "Matched: ...".
+- Fixed building inputs: 20 floors, window on floor 10 (was 50/25). Both
+  are mid-height, where stack is near zero: checked live 2026-10-15, same
+  fog for 50/25 and 20/10 at two NYC addresses.
+- FINDING: neighbouring NREL weather cells can disagree a lot near the fog
+  threshold. VIG over single pane, wet/wet, no desiccant, 70 F / 30 %:
+  350 Fifth Ave (cell 40.73, -73.98) 0 fog days; 277 Park (cell 40.77,
+  -73.98) 66 fog days/yr. Each cell's typical year picks different months.
+- Default example: 350 Fifth Avenue, New York (first load only).
+- Site climate from the engine (coldest/warmest hour, annual mean, HDD65
+  from daily means, days with a mean below freezing) is now in each result
+  (engine.climate) for the report.
+- Tests 65 -> 72.
 
 ## v1.11.0 (des2, 2026-09-29): U per glass
 

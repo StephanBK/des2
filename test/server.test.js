@@ -8,6 +8,7 @@ import { request } from 'node:http'
 
 import { createApp } from '../server/index.js'
 import { createEngineClient } from '../server/engine.js'
+import { createSuggester } from '../server/suggest.js'
 import { DEFAULTS } from '../shared/scenario.js'
 import { fakeEngine } from './fake-engine.js'
 
@@ -23,7 +24,7 @@ after(async () => { await rm(dist, { recursive: true, force: true }) })
 async function start(t, opts = {}) {
   const f = fakeEngine(opts)
   const engine = createEngineClient({ baseUrl: 'http://engine.test', fetchImpl: f.fetchImpl, retryDelayMs: 1 })
-  const app = createApp({ engine, distDir: dist, log: () => {} })
+  const app = createApp({ engine, distDir: dist, log: () => {}, suggester: opts.suggester ?? createSuggester({ token: '' }) })
   await new Promise((r) => app.listen(0, r))
   const port = app.address().port
   const get = (path, headers = {}) => new Promise((resolve, reject) => {
@@ -134,4 +135,56 @@ test('path traversal is refused and unknown files are 404', async (t) => {
   assert.equal((await s.get('/assets/..%2f..%2f..%2fetc%2fpasswd')).status, 403)
   assert.equal((await s.get('/nope.js')).status, 404)
   assert.equal((await s.get('/api/nope')).status, 404)
+})
+
+// ------------------------------------------------------------ address suggestions
+
+function fakeMapbox({ status = 200, features } = {}) {
+  const calls = []
+  const fetchImpl = async (url) => {
+    calls.push(new URL(url))
+    return { status, json: async () => ({ features: features ?? [
+      { geometry: { coordinates: [-87.635955, 41.878687] }, properties: {
+        full_address: '233 South Wacker Drive, Chicago, Illinois 60606, United States', name: '233 South Wacker Drive',
+        place_formatted: 'Chicago, Illinois 60606, United States', feature_type: 'address',
+        coordinates: { longitude: -87.635955, latitude: 41.878687 } } },
+      { geometry: { coordinates: [0, 0] }, properties: {} },          // unusable: no address
+    ] }) }
+  }
+  return { fetchImpl, calls }
+}
+
+test('suggest: maps Mapbox features, drops unusable ones, caches, keeps the token server-side', async (t) => {
+  const m = fakeMapbox()
+  const s = await start(t, { suggester: createSuggester({ token: 'pk.test', fetchImpl: m.fetchImpl }) })
+  const r = await s.get('/api/suggest?q=233%20s%20wacker')
+  assert.equal(r.status, 200)
+  assert.deepEqual(r.json.suggestions, [{
+    full: '233 South Wacker Drive, Chicago, Illinois 60606, United States', name: '233 South Wacker Drive',
+    place: 'Chicago, Illinois 60606, United States', type: 'address', lat: 41.87869, lon: -87.63595,
+  }])
+  assert.ok(!r.text.includes('pk.test'), 'token never sent to the browser')
+  const u = m.calls[0]
+  assert.equal(u.searchParams.get('autocomplete'), 'true')
+  assert.equal(u.searchParams.get('country'), 'us,ca,mx,pr')
+  await s.get('/api/suggest?q=233%20S%20WACKER')                     // same query, other case
+  assert.equal(m.calls.length, 1)
+})
+
+test('suggest: off without a token, short queries refused, upstream errors are clean', async (t) => {
+  const off = await start(t)
+  const r = await off.get('/api/suggest?q=233%20s%20wacker')
+  assert.equal(r.status, 503)
+  assert.equal((await off.get('/api/config')).json.suggest, false)
+
+  const m = fakeMapbox()
+  const on = await start(t, { suggester: createSuggester({ token: 'pk.test', fetchImpl: m.fetchImpl }) })
+  assert.equal((await on.get('/api/suggest?q=ab')).status, 400)
+  assert.equal(m.calls.length, 0)
+  assert.equal((await on.get('/api/config')).json.suggest, true)
+
+  const bad = await start(t, { suggester: createSuggester({ token: 'pk.test', fetchImpl: fakeMapbox({ status: 401 }).fetchImpl }) })
+  const e = await bad.get('/api/suggest?q=233%20s%20wacker')
+  assert.equal(e.status, 502)
+  assert.ok(!e.text.includes('pk.test'))
 })

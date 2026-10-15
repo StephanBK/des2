@@ -12,6 +12,17 @@ const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]   // TMY: no
 export const MONTH_SHORT = MONTHS.map((m) => m.slice(0, 3))
 export const MONTH_START_DAY = MONTH_DAYS.reduce((acc, d, i) => { acc.push(i === 0 ? 0 : acc[i - 1] + MONTH_DAYS[i - 1]); return acc }, [])
 
+/**
+ * Short place name from a full address, for labels: the city.
+ * "233 South Wacker Drive, Chicago, Illinois 60606, United States" -> "Chicago".
+ * Mapbox full addresses run street, city, state + ZIP, country.
+ */
+export function placeName(full) {
+  const parts = String(full || '').split(',').map((x) => x.trim()).filter(Boolean)
+  if (parts.length >= 3) return parts[1]
+  return parts[0] || ''
+}
+
 /** Day of year (0..364) to { month (0..11), day (1..31) }. */
 export function dayToDate(dayOfYear) {
   let d = dayOfYear
