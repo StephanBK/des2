@@ -210,7 +210,8 @@ function SummaryPage({ data }) {
     h(Text, { style: s.h1 }, street),
     rest ? h(Text, { style: s.h1sub }, rest) : null,
     h(Text, { style: { fontSize: 9.5, color: C.ink2, marginTop: 8 } },
-      `Secondary window retrofit: existing ${inSentence(cfg.existing.label)} with an INOVUES ${cfg.glass.product} (${inSentence(cfg.glass.label)}) retrofit, ${cfg.lb ? `${cfg.lb} lb of desiccant` : 'no desiccant'}, room at ${cfg.t} °F and ${cfg.rh} % RH.`),
+      // \u00a0 (no-break space) keeps each number on the same line as its unit.
+      `Secondary window retrofit: existing ${inSentence(cfg.existing.label)} with an INOVUES ${cfg.glass.product} (${inSentence(cfg.glass.label)}) retrofit, ${cfg.lb ? `${cfg.lb}\u00a0lb of desiccant` : 'no desiccant'}, room at ${cfg.t}\u00a0°F and ${cfg.rh}\u00a0% RH.`),
 
     h(View, { style: { marginTop: 13, backgroundColor: tone.bg, borderLeftWidth: 4, borderLeftColor: tone.bd, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 2 } },
       h(Text, { style: { fontSize: 7.5, fontWeight: 600, letterSpacing: 1.2, color: tone.ink } }, 'OUTLOOK FOR A TYPICAL YEAR'),
