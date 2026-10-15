@@ -522,13 +522,13 @@ function OptionsPage({ data }) {
       'Why a better-insulating retrofit can fog more: it keeps more heat in the room, so the existing glass in front of it runs colder. That is expected physics, not a defect; the seals and desiccant decide how much moisture reaches that cold glass.'),
 
     h(View, { style: { marginTop: 14 }, wrap: false },
-      h(SectionTitle, { lead: 'Visible fog days per year against room relative humidity, long term: without desiccant, which is also where any desiccant ends up once it is full. Each point is a full hour-by-hour simulation at the site.' }, 'Humidity headroom'),
-      h(HeadroomChart, { data, width: CW, height: 150 }),
+      h(SectionTitle, { lead: 'Fog days per year by room humidity, long term: without desiccant, or once it is full.' }, 'Humidity headroom'),
+      h(HeadroomChart, { data, width: CW, height: 118 }),
       h(View, { style: { flexDirection: 'row', marginTop: 6 } },
         ...data.options.map((o) => h(View, { key: o.key, style: { flexDirection: 'row', alignItems: 'center', marginRight: 16 } },
           h(View, { style: { width: 14, height: o.selected ? 2 : 1.2, backgroundColor: GLASS_COLOR[o.key], marginRight: 5 } }),
           h(Text, { style: { fontSize: 7.8, color: C.ink2, fontWeight: o.selected ? 600 : 400 } }, `${o.product}: ${headroomText(o).toLowerCase()}`)))),
-      h(Text, { style: { ...s.small, marginTop: 4 } }, `Room temperature ${data.config.t} °F throughout. "Clear up to" is the highest tested humidity, in 5 % steps, below which the pane shows no visible fog in the settled year.`)),
+      h(Text, { style: { ...s.small, marginTop: 4 } }, `Each point is a full hour-by-hour simulation, room at ${data.config.t}\u00a0°F. "Clear up to": the highest humidity tested (5\u00a0% steps) with no visible fog.`)),
 
     h(View, { style: { marginTop: 14 }, wrap: false },
       h(SectionTitle, { lead: `From the typical weather year the simulation uses: NREL ${data.site.weather || 'NSRDB'}, grid cell ${cellText(data.site.weather_cell)}.` }, 'Site climate'),
@@ -541,7 +541,17 @@ function OptionsPage({ data }) {
           { label: 'FREEZING DAYS', value: fmt0(cl.freezing_days), sub: 'daily mean under 32 °F' },
         ],
       })),
+    h(Disclaimer),
     h(Footer, { data }))
+}
+
+// Liability disclaimer, last thing in the report (2026-10-15, after the
+// method page was removed). Wording to be reviewed by INOVUES counsel.
+export const DISCLAIMER = 'Disclaimer: Computer-model estimates for a typical weather year, based on the inputs and assumptions shown, some of them estimated. Actual performance depends on weather, installation, building operation and maintenance, and may differ. For planning and comparison only; not a warranty, guarantee or certified engineering analysis. Product warranties are governed solely by INOVUES\' written warranty and contract terms. INOVUES, Inc. accepts no liability for decisions made or losses incurred in reliance on this report.'
+
+function Disclaimer() {
+  return h(View, { style: { marginTop: 10, borderTopWidth: 0.6, borderTopColor: C.line, paddingTop: 5 }, wrap: false },
+    h(Text, { style: { fontSize: 6.8, color: C.ink3, lineHeight: 1.35 } }, DISCLAIMER))
 }
 
 export async function renderReportPdf(data) {

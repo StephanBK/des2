@@ -26,6 +26,13 @@ run" with the detail "engine returned no fog map": by design, not a crash.
   "not a warranty" line, the typical-year / neighbouring-cell caveat, the
   unmeasured-seal caveat and the reopen-this-scenario link. The page-1
   ESTIMATE note for an existing double pane stays.
+- v2.2.2: a liability disclaimer closes page 3 (DISCLAIMER in
+  server/report-pdf.js, tested for its key phrases): model estimates for a
+  typical year, may differ, planning only, not a warranty / guarantee /
+  certified engineering analysis, product warranties per INOVUES' written
+  terms, no liability for reliance. To make room the headroom chart is
+  118 pt tall and its notes are one line each. Counsel should review the
+  wording.
 
 - Stephan: an export that summarizes the findings for a customer, highly
   polished, with the address and the condensation days, plus anything that

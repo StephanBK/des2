@@ -9,6 +9,7 @@ import { createApp } from '../server/index.js'
 import { createEngineClient } from '../server/engine.js'
 import { createSuggester } from '../server/suggest.js'
 import { cleanProject, headroomOf, monthlyFogDays, reportId, RH_LEVELS } from '../server/report-data.js'
+import { DISCLAIMER } from '../server/report-pdf.js'
 import { DEFAULTS } from '../shared/scenario.js'
 import { fakeEngine } from './fake-engine.js'
 
@@ -137,4 +138,10 @@ test('report PDF: a 3-page PDF, downloadable, named after the site and report id
   assert.match(cd, /^attachment; filename="INOVUES-cavity-assessment-350-Fifth-Avenue-[0-9A-Z]{7}\.pdf"$/)
   const pages = (r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length
   assert.equal(pages, 3)
+})
+
+test('the report carries a liability disclaimer', () => {
+  for (const phrase of ['estimates', 'may differ', 'not a warranty', 'guarantee', 'written warranty', 'accepts no liability']) {
+    assert.ok(DISCLAIMER.includes(phrase), phrase)
+  }
 })
