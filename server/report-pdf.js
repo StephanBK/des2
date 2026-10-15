@@ -201,7 +201,7 @@ function SummaryPage({ data }) {
   const v = verdictOf(data)
   const tone = v.clear ? { bg: C.tealSoft, bd: C.teal, ink: C.tealInk } : { bg: C.fogSoft, bd: C.fog, ink: C.fogInk }
   const verdict = v.text
-  const est = cfg.thermal.estimate
+  const est = cfg.thermal.u_estimate
   const seal = (x) => `${x.label}${x.cfm_ft2 !== null ? `, ${x.cfm_ft2} cfm/ft² at 75 Pa` : ''}`
 
   return h(Page, { size: 'LETTER', style: s.page },
@@ -234,7 +234,8 @@ function SummaryPage({ data }) {
         h(Text, { style: s.h3 }, 'Window assembly'),
         h(KV, { k: 'Existing glass', v: cfg.existing.label }),
         h(KV, { k: 'Retrofit glass', v: `${cfg.glass.product} (${cfg.glass.label})` }),
-        h(KV, { k: 'Thermal values', v: `U ${cfg.thermal.u_ip.toFixed(3)} Btu/hr·ft²·°F, f ${cfg.thermal.f_cold.toFixed(3)}`, extra: est ? h(Tag, { text: 'ESTIMATE' }) : null }),
+        // U last, so the ESTIMATE tag sits right after the value it qualifies.
+        h(KV, { k: 'Thermal values', v: `f ${cfg.thermal.f_cold.toFixed(3)}, U ${cfg.thermal.u_ip.toFixed(3)} Btu/hr·ft²·°F`, extra: est ? h(Tag, { text: 'ESTIMATE' }) : null }),
         h(KV, { k: 'Cavity', v: '0.6 in between existing glass and retrofit' }),
         h(KV, { k: 'Existing seal', v: seal(cfg.seal_out) }),
         h(KV, { k: 'Retrofit seal', v: seal(cfg.seal_in) }),
@@ -244,7 +245,7 @@ function SummaryPage({ data }) {
     h(Glance, { data }),
     est ? h(View, { style: { marginTop: 9, backgroundColor: C.amberSoft, borderLeftWidth: 3, borderLeftColor: C.amber, paddingVertical: 4, paddingHorizontal: 8 } },
       h(Text, { style: { fontSize: 7.6, color: C.amberInk } },
-        'ESTIMATE: thermal values for an existing double pane come from a heat-flow model until LBNL WINDOW simulations replace them.'))
+        'ESTIMATE: the assembly U-value for an existing double pane is a heat-flow model estimate until a WINDOW result replaces it.'))
       : null,
     h(Footer, { data }))
 }
@@ -498,8 +499,8 @@ function OptionsTable({ data }) {
         h(View, null,
           h(Text, { style: { fontSize: 8.8, fontWeight: 600 } }, o.product),
           h(Text, { style: { fontSize: 7, color: C.ink3 } }, o.selected ? `${o.label}, this report` : o.label))),
-      cell('u', `${o.thermal.u_ip.toFixed(3)}${o.thermal.estimate ? '*' : ''}`, cols[1].w),
-      cell('f', `${o.thermal.f_cold.toFixed(3)}${o.thermal.estimate ? '*' : ''}`, cols[2].w),
+      cell('u', `${o.thermal.u_ip.toFixed(3)}${o.thermal.u_estimate ? '*' : ''}`, cols[1].w),
+      cell('f', o.thermal.f_cold.toFixed(3), cols[2].w),
       cell('life', lifeText(o), cols[3].w),
       cell('first', firstFogText(o), cols[4].w),
       cell('days', String(o.fog_days_per_year), cols[5].w, { fontWeight: 600, color: o.fog_days_per_year ? C.fogInk : C.tealInk }),
@@ -510,14 +511,14 @@ function OptionsTable({ data }) {
 
 function OptionsPage({ data }) {
   const cl = data.site.climate || {}
-  const est = data.options.some((o) => o.thermal.estimate)
+  const est = data.options.some((o) => o.thermal.u_estimate)
   const best = [...data.options].sort((a, b) => a.fog_days_per_year - b.fog_days_per_year || (b.headroom.clear_up_to ?? 0) - (a.headroom.clear_up_to ?? 0))[0]
   return h(Page, { size: 'LETTER', style: s.page },
     h(TopBar, { data, title: 'Options and humidity headroom' }),
     h(SectionTitle, { lead: `The same site, existing ${data.config.existing.label.toLowerCase()}, seals, desiccant and room air, with each INOVUES retrofit glass.` }, 'Retrofit glass options'),
     h(OptionsTable, { data }),
     h(Text, { style: { ...s.small, marginTop: 5 } },
-      `Fog days per year are counted in the same simulation year as on page 1 for each option. ${est ? '* Estimate (existing double pane), pending WINDOW simulation. ' : ''}Fewest fog days in this comparison: ${best.product}.`),
+      `Fog days per year are counted in the same simulation year as on page 1 for each option. ${est ? '* U estimated (existing double pane), pending a WINDOW result. ' : ''}Fewest fog days in this comparison: ${best.product}.`),
     h(Text, { style: { ...s.small, marginTop: 3 } },
       'Why a better-insulating retrofit can fog more: it keeps more heat in the room, so the existing glass in front of it runs colder. That is expected physics, not a defect; the seals and desiccant decide how much moisture reaches that cold glass.'),
 

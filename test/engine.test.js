@@ -236,10 +236,10 @@ test('the default engine request is pinned', () => {
 
 test('each existing + retrofit pairing sends its own U and f', () => {
   // [U, f] by existing glass, then retrofit glass. Single: WINDOW f, INOVUES U.
-  // Double: the 2026-10-15 estimates (see THERMAL), until WINDOW replaces them.
+  // Double: f from WINDOW (2026-10-15); U still the estimate (see THERMAL).
   const expect = {
     single: { single: [0.352, 0.068], double: [0.249, 0.040], vig: [0.164, 0.014] },
-    double: { single: [0.249, 0.291], double: [0.193, 0.190], vig: [0.138, 0.074] },
+    double: { single: [0.249, 0.301], double: [0.193, 0.200], vig: [0.138, 0.064] },
   }
   assert.deepEqual(EXISTING.map((x) => x.key).sort(), Object.keys(expect).sort())
   for (const [ex, row] of Object.entries(expect)) {
@@ -254,10 +254,11 @@ test('each existing + retrofit pairing sends its own U and f', () => {
   }
 })
 
-test('thermal table: double-pane rows are flagged as estimates, single-pane rows are not', () => {
+test('thermal table: only the double-pane U values are flagged as estimates', () => {
   for (const g of GLASSES) {
-    assert.equal(thermalOf('single', g.key).estimate, false)
-    assert.equal(thermalOf('double', g.key).estimate, true)
+    assert.equal(thermalOf('single', g.key).u_estimate, false)
+    assert.equal(thermalOf('double', g.key).u_estimate, true)
+    assert.equal('estimate' in thermalOf('double', g.key), false, 'no blanket flag: f is from WINDOW')
   }
   assert.throws(() => thermalOf('triple', 'vig'), RangeError)
 })
@@ -276,7 +277,7 @@ test('thermal table: physical ordering holds', () => {
   }
 })
 
-test('thermal table: the double-pane estimates follow from the stated resistances', () => {
+test('thermal table: the estimated double-pane U follows from the stated resistances, and the same method lands within 0.011 of the WINDOW f', () => {
   // Independent recomputation of the comment in shared/scenario.js.
   const Ro = 1 / 26 + 0.006
   const dR = 0.200 + 0.006
@@ -284,8 +285,8 @@ test('thermal table: the double-pane estimates follow from the stated resistance
     const s1 = THERMAL.single[g.key]
     const f2 = (Ro + dR) / (Ro / s1.f_cold + dR)
     const u2 = 1 / (1 / s1.u_ip + dR * 5.678263)
-    assert.ok(Math.abs(f2 - THERMAL.double[g.key].f_cold) < 0.0006, `${g.key} f ${f2}`)
     assert.ok(Math.abs(u2 - THERMAL.double[g.key].u_ip) < 0.0006, `${g.key} U ${u2}`)
+    assert.ok(Math.abs(f2 - THERMAL.double[g.key].f_cold) < 0.011, `${g.key} model f ${f2} vs WINDOW ${THERMAL.double[g.key].f_cold}`)
   }
 })
 

@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '2.2.2'
+export const APP_VERSION = '2.3.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
@@ -13,7 +13,7 @@ export const GRAMS_PER_LB = 453.59237
 // Existing glass on the facade (v2.1). The retrofit goes 0.6 in behind it.
 export const EXISTING = [
   { key: 'single', label: 'Single pane', tip: 'Existing single-pane glass, as on most older commercial facades.' },
-  { key: 'double', label: 'Double pane', tip: 'Existing double-pane insulating glass unit (1 in overall: 1/4 in clear + 1/2 in air + 1/4 in clear). Values are estimates until WINDOW simulations replace them.' },
+  { key: 'double', label: 'Double pane', tip: 'Existing double-pane insulating glass unit (1 in overall: 1/4 in clear + 1/2 in air + 1/4 in clear). f values from WINDOW; U values are estimates until WINDOW results replace them.' },
 ]
 
 // Retrofit glass options: single = SWR, double = SWR-IG, VIG = SWR-VIG.
@@ -29,26 +29,30 @@ export const GLASSES = [
 //   u_ip    whole-assembly U-factor, Btu/hr.ft2.F
 // Existing single pane: f from WINDOW (the 2026-09-16 study), U given by
 // INOVUES 2026-09-29.
-// Existing double pane: ESTIMATES (2026-10-15) until Arnold's WINDOW runs.
-// One-dimensional series resistances, m2K/W, calibrated on the single-pane
-// f values above:
+// Existing double pane:
+//   f from WINDOW (Arnold, given by Stephan 2026-10-15): 0.301, 0.200, 0.064.
+//   U still an ESTIMATE (u_estimate: true) until Arnold's WINDOW U arrives.
+// Estimate method, one-dimensional series resistances, m2K/W, calibrated on
+// the single-pane f values above:
 //   R_o = 1/26 (outside film, NFRC 100 winter) + 0.006 (6 mm glass) = 0.0445
 //   R_tot = R_o / f_single                      (0.654, 1.112, 3.176)
 //   the IGU adds dR = 0.200 (1/2 in air gap) + 0.006 (second pane) = 0.206
 //   f_double = (R_o + dR) / (R_tot + dR)        (0.291, 0.190, 0.074)
 //   U_double = 1 / (1/U_single + dR x 5.678)    (0.249, 0.193, 0.138)
-// The U step adds the IGU's resistance over the whole assembly, frame
-// included, so it flatters U slightly; the f step is center of glass.
+// The estimated f came within 0.010 of WINDOW for all three glasses
+// (0.291 vs 0.301, 0.190 vs 0.200, 0.074 vs 0.064), so the same method's
+// U values are a fair stand-in. The U step adds the IGU's resistance over
+// the whole assembly, frame included, so it flatters U slightly.
 export const THERMAL = {
   single: {
-    single: { f_cold: 0.068, u_ip: 0.352, estimate: false },
-    double: { f_cold: 0.040, u_ip: 0.249, estimate: false },
-    vig: { f_cold: 0.014, u_ip: 0.164, estimate: false },
+    single: { f_cold: 0.068, u_ip: 0.352, u_estimate: false },
+    double: { f_cold: 0.040, u_ip: 0.249, u_estimate: false },
+    vig: { f_cold: 0.014, u_ip: 0.164, u_estimate: false },
   },
   double: {
-    single: { f_cold: 0.291, u_ip: 0.249, estimate: true },
-    double: { f_cold: 0.190, u_ip: 0.193, estimate: true },
-    vig: { f_cold: 0.074, u_ip: 0.138, estimate: true },
+    single: { f_cold: 0.301, u_ip: 0.249, u_estimate: true },
+    double: { f_cold: 0.200, u_ip: 0.193, u_estimate: true },
+    vig: { f_cold: 0.064, u_ip: 0.138, u_estimate: true },
   },
 }
 
@@ -62,7 +66,7 @@ export function thermalOf(existing, glass) {
 export function glassTip(existing, glass) {
   const g = GLASSES.find((x) => x.key === glass)
   const t = thermalOf(existing, glass)
-  return `${g.label} retrofit glass (${g.product}). Cavity-side temperature factor of the existing glass f = ${t.f_cold.toFixed(3)}, assembly U = ${t.u_ip.toFixed(3)} Btu/hr·ft²·°F${t.estimate ? ' (estimate)' : ''}.`
+  return `${g.label} retrofit glass (${g.product}). Cavity-side temperature factor of the existing glass f = ${t.f_cold.toFixed(3)}, assembly U = ${t.u_ip.toFixed(3)} Btu/hr·ft²·°F${t.u_estimate ? ' (estimate)' : ''}.`
 }
 
 // Seal ladders, tightest first. Keys are the engine's preset keys; the
@@ -142,7 +146,7 @@ export const ASSUMPTIONS = [
   '"Wet-sealed" is the ASTM E283 detection floor (0.005 cfm/ft² at 75 Pa), not a measurement of an installed INOVUES seal. A pressure test on an installed cavity would replace it.',
   'With desorption on, the desiccant gives some water back when warm and takes it up again when cold, a small seasonal buffer: slightly less fog after it is full, and a longer life. The engine gives 3A no extra capacity below 25 °C; real 3A holds a few percent more when cold, so the results are on the cautious side here.',
   'After the desiccant is full, the pane fogs about as much as with no desiccant. What decides how much is the real air leakage of the wet seals, which has not been measured on an installed cavity.',
-  'Each pairing of existing glass and retrofit glass has its own cavity-side temperature factor and assembly U-value (hover a glass button to see them). Over an existing single pane: from WINDOW and INOVUES. Over an existing double pane: estimates from a layer-by-layer heat-flow model until WINDOW simulations replace them.',
+  'Each pairing of existing glass and retrofit glass has its own cavity-side temperature factor and assembly U-value (hover a glass button to see them). Over an existing single pane: from WINDOW and INOVUES. Over an existing double pane: f from WINDOW; U estimated from a layer-by-layer heat-flow model until WINDOW results replace it.',
   '"Desiccant full" means 95 % of its capacity at 25 °C.',
   'The same typical weather year repeats; no climate trend or unusual years.',
 ]

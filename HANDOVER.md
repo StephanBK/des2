@@ -1,7 +1,8 @@
 # HANDOVER: cavity fog outlook (des2)
 
-Last session: 2026-10-15. State: v2.2.0 (any address, existing single or
-double pane, customer PDF report). Before that:
+Last session: 2026-10-15. State: v2.3.0 (any address, existing single or
+double pane with WINDOW f values, customer PDF report, 3 pages with a
+disclaimer). Before that:
 2026-09-29, v1.11.0. Repo StephanBK/des2 (Stephan's
 personal account), a copy of StephanBK/park277-desiccant with full history
 (up to v1.10.0, main ad19a79). des2 is identical to park277-desiccant in
@@ -17,6 +18,25 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.3.0 (2026-10-15): WINDOW f values for an existing double pane
+
+- Stephan (from Arnold's WINDOW runs): f for an existing double pane with
+  SWR 0.301, SWR-IG 0.200, SWR-VIG 0.064. U values still to come.
+- THERMAL.double f replaced; the blanket `estimate` flag became
+  `u_estimate` (true only for the double-pane U). App note, tooltips,
+  assumptions text, report tag (now right after U), report note and the
+  options-table asterisk (U column only) all say "U estimated".
+- My 1-D estimates were 0.291 / 0.190 / 0.074: off by +0.010, +0.010,
+  -0.010 versus WINDOW. A test keeps that agreement within 0.011 and
+  still recomputes the estimated U.
+- Effect, Boston 2 Liberty Sq, existing double, 4 lb, 70 F / 35 % RH:
+  fog days/yr SWR 0 -> 0, SWR-IG 39 -> 1, SWR-VIG 154 -> 157; headroom
+  unchanged (40 / 30 / 25 %); desiccant life unchanged. SWR-IG at 35 %
+  sits on the fog threshold, so +0.010 in f removed almost all its fog.
+- To finish when Arnold sends U: replace THERMAL.double u_ip, set
+  u_estimate: false, update the expected U in the test "each existing +
+  retrofit pairing...", drop the U recomputation test.
 
 ## v2.2.0 (2026-10-15): customer report (PDF)
 

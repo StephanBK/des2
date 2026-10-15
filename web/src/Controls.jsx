@@ -94,7 +94,7 @@ export function ExistingPicker({ value, onPick }) {
         })}
       </div>
       {value === 'double' && (
-        <p className="est-note">Glass values for an existing double pane are estimates until WINDOW simulations replace them.</p>
+        <p className="est-note">Over an existing double pane, f values are from WINDOW; U values are estimates until WINDOW results replace them.</p>
       )}
     </Group>
   )
