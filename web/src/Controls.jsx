@@ -1,4 +1,4 @@
-import { GLASSES, RANGES } from '../../shared/scenario.js'
+import { EXISTING, GLASSES, glassTip, RANGES } from '../../shared/scenario.js'
 
 // Leak bar length on a log scale: the ladders span 0.005 to 2.0 cfm/ft2,
 // a factor of 400, so a linear bar would show everything but the last rung
@@ -79,7 +79,28 @@ function Slider({ id, label, value, unit, range, onChange, ticks }) {
   )
 }
 
-export function GlassPicker({ value, onPick }) {
+export function ExistingPicker({ value, onPick }) {
+  return (
+    <Group title="Existing glass">
+      <div className="seg two" role="radiogroup" aria-label="Existing glass">
+        {EXISTING.map((x) => {
+          const on = value === x.key
+          return (
+            <button key={x.key} type="button" role="radio" aria-checked={on} className={on ? 'on' : ''}
+              data-tip={x.tip} onClick={() => onPick(x.key)}>
+              {x.label}
+            </button>
+          )
+        })}
+      </div>
+      {value === 'double' && (
+        <p className="est-note">Glass values for an existing double pane are estimates until WINDOW simulations replace them.</p>
+      )}
+    </Group>
+  )
+}
+
+export function GlassPicker({ value, existing, onPick }) {
   return (
     <Group title="Retrofit glass">
       <div className="seg" role="radiogroup" aria-label="Retrofit glass">
@@ -87,7 +108,7 @@ export function GlassPicker({ value, onPick }) {
           const on = value === g.key
           return (
             <button key={g.key} type="button" role="radio" aria-checked={on} className={on ? 'on' : ''}
-              data-tip={g.tip} onClick={() => onPick(g.key)}>
+              data-tip={glassTip(existing, g.key)} onClick={() => onPick(g.key)}>
               {g.label}
             </button>
           )

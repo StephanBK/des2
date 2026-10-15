@@ -5,7 +5,7 @@ import AddressBox from './AddressBox.jsx'
 import { fetchConfig, peek, queryOf, readUrlHours, readUrlScenario, runScenario, writeUrlScenario } from './api.js'
 import Assumptions from './Assumptions.jsx'
 import Cavity from './Cavity.jsx'
-import { DesiccantSlider, dewPointF, GlassPicker, RoomSliders, SealLadder } from './Controls.jsx'
+import { DesiccantSlider, dewPointF, ExistingPicker, GlassPicker, RoomSliders, SealLadder } from './Controls.jsx'
 import FogCalendar, { Legend } from './FogCalendar.jsx'
 
 function ErrorPanel({ error, onRetry }) {
@@ -138,6 +138,7 @@ export default function App() {
 
         <section className="rig" aria-label="Scenario">
           <div className="side outside-side">
+            <ExistingPicker value={scenario.ex} onPick={(k) => update({ ex: k })} />
             <SealLadder title="Existing window seal" items={SEALS_EXISTING} value={scenario.seal_out}
               engineValues={config?.seals_existing} onPick={(k) => update({ seal_out: k })} />
           </div>
@@ -147,7 +148,7 @@ export default function App() {
               place={placeName(data?.engine?.site || scenario.addr)}
               dewF={dewPointF(scenario.t, scenario.rh)} />
             <div className="under">
-              <GlassPicker value={scenario.glass} onPick={(k) => update({ glass: k })} />
+              <GlassPicker value={scenario.glass} existing={scenario.ex} onPick={(k) => update({ glass: k })} />
               <DesiccantSlider value={scenario.lb} onChange={(v) => update({ lb: v }, 'slider')} />
             </div>
           </div>

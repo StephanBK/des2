@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import {
   climateOf, createEngineClient, ECHO_EXEMPT, ECHO_KEYS, engineParams, HttpError, parseScenario, scenarioKey,
 } from '../server/engine.js'
-import { ADDRESS, DEFAULTS, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT } from '../shared/scenario.js'
+import { ADDRESS, DEFAULTS, EXISTING, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT, THERMAL, thermalOf } from '../shared/scenario.js'
 import { fakeEngine } from './fake-engine.js'
 
 const q = (o) => new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]))
@@ -20,6 +20,8 @@ test('defaults parse', () => {
 })
 
 test('every control option parses', () => {
+  for (const x of EXISTING) assert.equal(parseScenario(q({ ...DEFAULTS, ex: x.key })).ex, x.key)
+  assert.throws(() => parseScenario(q({ ...DEFAULTS, ex: 'triple' })), (e) => e.status === 400)
   for (const g of GLASSES) for (const o of SEALS_EXISTING) for (const i of SEALS_RETROFIT) {
     assert.equal(parseScenario(q({ ...DEFAULTS, glass: g.key, seal_out: o.key, seal_in: i.key })).glass, g.key)
   }
@@ -232,19 +234,62 @@ test('the default engine request is pinned', () => {
   })
 })
 
-test('des2: each glass sends its own U and f (SWR, SWR-IG, SWR-VIG)', () => {
-  const expect = { single: [0.352, 0.068], double: [0.249, 0.040], vig: [0.164, 0.014] }
-  assert.deepEqual(GLASSES.map((g) => g.key).sort(), Object.keys(expect).sort())
-  for (const [glass, [u, f]] of Object.entries(expect)) {
-    for (const lb of [0, 4, 8]) {
-      const p = engineParams({ ...DEFAULTS, glass, lb })
-      assert.equal(p.u_ip, u, `${glass} ${lb} lb U`)
-      assert.equal(p.f_cold, f, `${glass} ${lb} lb f`)
+test('each existing + retrofit pairing sends its own U and f', () => {
+  // [U, f] by existing glass, then retrofit glass. Single: WINDOW f, INOVUES U.
+  // Double: the 2026-10-15 estimates (see THERMAL), until WINDOW replaces them.
+  const expect = {
+    single: { single: [0.352, 0.068], double: [0.249, 0.040], vig: [0.164, 0.014] },
+    double: { single: [0.249, 0.291], double: [0.193, 0.190], vig: [0.138, 0.074] },
+  }
+  assert.deepEqual(EXISTING.map((x) => x.key).sort(), Object.keys(expect).sort())
+  for (const [ex, row] of Object.entries(expect)) {
+    assert.deepEqual(GLASSES.map((g) => g.key).sort(), Object.keys(row).sort())
+    for (const [glass, [u, f]] of Object.entries(row)) {
+      for (const lb of [0, 4, 8]) {
+        const p = engineParams({ ...DEFAULTS, ex, glass, lb })
+        assert.equal(p.u_ip, u, `${ex}/${glass} ${lb} lb U`)
+        assert.equal(p.f_cold, f, `${ex}/${glass} ${lb} lb f`)
+      }
     }
   }
 })
 
-test('des2 guard: U is per glass, never fixed', () => {
+test('thermal table: double-pane rows are flagged as estimates, single-pane rows are not', () => {
+  for (const g of GLASSES) {
+    assert.equal(thermalOf('single', g.key).estimate, false)
+    assert.equal(thermalOf('double', g.key).estimate, true)
+  }
+  assert.throws(() => thermalOf('triple', 'vig'), RangeError)
+})
+
+test('thermal table: physical ordering holds', () => {
+  for (const ex of Object.keys(THERMAL)) {
+    const t = THERMAL[ex]
+    // better retrofit glass -> lower U, and a colder existing glass (lower f)
+    assert.ok(t.single.u_ip > t.double.u_ip && t.double.u_ip > t.vig.u_ip, `${ex} U order`)
+    assert.ok(t.single.f_cold > t.double.f_cold && t.double.f_cold > t.vig.f_cold, `${ex} f order`)
+  }
+  for (const g of GLASSES) {
+    // an existing IGU adds resistance outboard: warmer cavity-side glass, lower U
+    assert.ok(THERMAL.double[g.key].f_cold > THERMAL.single[g.key].f_cold, `${g.key} f rises`)
+    assert.ok(THERMAL.double[g.key].u_ip < THERMAL.single[g.key].u_ip, `${g.key} U falls`)
+  }
+})
+
+test('thermal table: the double-pane estimates follow from the stated resistances', () => {
+  // Independent recomputation of the comment in shared/scenario.js.
+  const Ro = 1 / 26 + 0.006
+  const dR = 0.200 + 0.006
+  for (const g of GLASSES) {
+    const s1 = THERMAL.single[g.key]
+    const f2 = (Ro + dR) / (Ro / s1.f_cold + dR)
+    const u2 = 1 / (1 / s1.u_ip + dR * 5.678263)
+    assert.ok(Math.abs(f2 - THERMAL.double[g.key].f_cold) < 0.0006, `${g.key} f ${f2}`)
+    assert.ok(Math.abs(u2 - THERMAL.double[g.key].u_ip) < 0.0006, `${g.key} U ${u2}`)
+  }
+})
+
+test('guard: U and f are never fixed', () => {
   assert.equal('u_ip' in FIXED, false, 'u_ip must not be in FIXED')
-  for (const g of GLASSES) assert.ok(typeof g.u_ip === 'number' && g.u_ip > 0, `${g.key} has a positive u_ip`)
+  assert.equal('f_cold' in FIXED, false, 'f_cold must not be in FIXED')
 })

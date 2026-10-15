@@ -1,8 +1,8 @@
 // The page's side of /api/run and /api/config.
 
-import { ADDRESS, DEFAULTS, GLASSES, RANGES, SEALS_EXISTING, SEALS_RETROFIT } from '../../shared/scenario.js'
+import { ADDRESS, DEFAULTS, EXISTING, GLASSES, RANGES, SEALS_EXISTING, SEALS_RETROFIT } from '../../shared/scenario.js'
 
-const ORDER = ['glass', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+const ORDER = ['ex', 'glass', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
 
 export class ApiError extends Error {
   constructor(message, status, detail) {
@@ -91,6 +91,7 @@ function urlSite(p) {
 export function readUrlScenario(search = window.location.search) {
   const p = new URLSearchParams(search)
   return {
+    ex: pick(p.get('ex'), EXISTING, DEFAULTS.ex),
     glass: pick(p.get('glass'), GLASSES, DEFAULTS.glass),
     seal_out: pick(p.get('seal_out'), SEALS_EXISTING, DEFAULTS.seal_out),
     seal_in: pick(p.get('seal_in'), SEALS_RETROFIT, DEFAULTS.seal_in),

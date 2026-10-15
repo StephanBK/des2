@@ -1,7 +1,7 @@
 // Cavity fog outlook (des2): web server.
 //
 // Serves the built page from dist/ and these API routes:
-//   GET /api/run?glass=&seal_out=&seal_in=&lb=&t=&rh=&addr=[&lat=&lon=]   one simulation
+//   GET /api/run?ex=&glass=&seal_out=&seal_in=&lb=&t=&rh=&addr=[&lat=&lon=]   one simulation
 //   GET /api/suggest?q=                                 address suggestions (Mapbox)
 //   GET /api/config                                     controls + preset values
 //   GET /health                                         always 200 while the app runs
@@ -19,7 +19,7 @@ import { coalescer, LruCache } from './cache.js'
 import { createEngineClient, HttpError, parseScenario, scenarioKey } from './engine.js'
 import { createSuggester } from './suggest.js'
 import {
-  APP_VERSION, ASSUMPTIONS, DEFAULTS, ENGINE_DEFAULT_URL, FIXED_DESCRIPTION, GLASSES, RANGES,
+  APP_VERSION, ASSUMPTIONS, DEFAULTS, ENGINE_DEFAULT_URL, EXISTING, FIXED_DESCRIPTION, GLASSES, RANGES, THERMAL,
   SEALS_EXISTING, SEALS_RETROFIT,
 } from '../shared/scenario.js'
 
@@ -95,7 +95,9 @@ export function createApp({
     const withValues = (list, side) => list.map((s) => ({ ...s, ...(presets?.meta?.[side]?.[s.key] ? { engine: presets.meta[side][s.key] } : {}) }))
     sendJson(req, res, 200, {
       version: APP_VERSION,
+      existing: EXISTING,
       glasses: GLASSES,
+      thermal: THERMAL,
       seals_existing: withValues(SEALS_EXISTING, 'al_out'),
       seals_retrofit: withValues(SEALS_RETROFIT, 'al_in'),
       ranges: RANGES,

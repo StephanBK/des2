@@ -10,7 +10,7 @@
 //   5. An engine without the fog-map API is reported as out of date.
 
 import {
-  ADDRESS, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, YEARS_AFTER_FULL,
+  ADDRESS, EXISTING, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, YEARS_AFTER_FULL,
 } from '../shared/scenario.js'
 
 export class HttpError extends Error {
@@ -21,7 +21,7 @@ export class HttpError extends Error {
   }
 }
 
-const CONTROLS = ['glass', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+const CONTROLS = ['ex', 'glass', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
 
 function intInRange(name, raw, { min, max, step }) {
   if (raw === null || raw === undefined || raw === '') throw new HttpError(400, `Missing ${name}`)
@@ -73,6 +73,7 @@ export function parseScenario(params) {
     if (!CONTROLS.includes(k)) throw new HttpError(400, `Unknown parameter "${k}"`)
   }
   return {
+    ex: oneOf('ex', params.get('ex'), EXISTING),
     glass: oneOf('glass', params.get('glass'), GLASSES),
     seal_out: oneOf('seal_out', params.get('seal_out'), SEALS_EXISTING),
     seal_in: oneOf('seal_in', params.get('seal_in'), SEALS_RETROFIT),
@@ -91,7 +92,7 @@ export function scenarioKey(s) {
 
 /** Full engine query for a scenario. */
 export function engineParams(s) {
-  const glass = GLASSES.find((g) => g.key === s.glass)
+  const th = thermalOf(s.ex, s.glass)
   const grams = Math.round(s.lb * GRAMS_PER_LB * 1000) / 1000
   return {
     address: s.addr,
@@ -101,8 +102,8 @@ export function engineParams(s) {
     // fresh cavity air (a start-up year, less fog); year 2 is the settled
     // year the page reports.
     max_years: s.lb === 0 ? 2 : FIXED.max_years,
-    f_cold: glass.f_cold,
-    u_ip: glass.u_ip,
+    f_cold: th.f_cold,
+    u_ip: th.u_ip,
     al_out: s.seal_out,
     al_in: s.seal_in,
     grams,

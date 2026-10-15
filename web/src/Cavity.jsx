@@ -82,7 +82,9 @@ export function dryChip(r) {
 export default function Cavity({ scenario, sealRanks, result, busy, dewF, glassLabel, working = false, place = '' }) {
   const build = BUILD[scenario.glass]
   const retroEnd = RETRO_X + build.panes[build.panes.length - 1][1]
-  const frameL = PANE_X - 12
+  // An existing double pane: its outer lite sits 16 px outboard, air between.
+  const igu = scenario.ex === 'double'
+  const frameL = PANE_X - (igu ? 28 : 12)
   const frameR = retroEnd + 12
   const cavL = PANE_X + 8
   const cavR = RETRO_X
@@ -102,7 +104,7 @@ export default function Cavity({ scenario, sealRanks, result, busy, dewF, glassL
   return (
     <figure className="cavity">
       <svg viewBox={`0 0 ${W} ${H}`} role="img"
-        aria-label={`Section through the window: existing pane, 0.6 inch cavity with ${lb} lb of desiccant, ${glassLabel} retrofit, room at ${scenario.t} °F and ${scenario.rh} % relative humidity.`}>
+        aria-label={`Section through the window: existing ${igu ? 'double-pane unit' : 'single pane'}, 0.6 inch cavity with ${lb} lb of desiccant, ${glassLabel} retrofit, room at ${scenario.t} °F and ${scenario.rh} % relative humidity.`}>
         <defs>
           <pattern id="beads" width="7" height="7" patternUnits="userSpaceOnUse">
             <circle cx="3.5" cy="3.5" r="2.3" fill="var(--teal)" opacity="0.85" />
@@ -146,9 +148,17 @@ export default function Cavity({ scenario, sealRanks, result, busy, dewF, glassL
           </g>
         )}
 
-        {/* existing pane */}
+        {/* existing glass: one pane, or an insulating unit with its air gap */}
+        {igu && (
+          <g>
+            <rect x={PANE_X - 9} y={HEAD[1]} width="9" height={SILL[0] - HEAD[1]} fill="var(--cavity)" />
+            <rect x={PANE_X - 16} y={HEAD[1]} width="7" height={SILL[0] - HEAD[1]} fill="url(#glass)" stroke="var(--pane-edge)" strokeWidth="1" />
+            <rect x={PANE_X - 9} y={HEAD[1]} width="9" height="5" fill="var(--seal)" />
+            <rect x={PANE_X - 9} y={SILL[0] - 5} width="9" height="5" fill="var(--seal)" />
+          </g>
+        )}
         <rect x={PANE_X} y={HEAD[1]} width="8" height={SILL[0] - HEAD[1]} fill="url(#glass)" stroke="var(--pane-edge)" strokeWidth="1" />
-        <text className="part" x={PANE_X + 4} y={H - 8} textAnchor="middle">Existing pane</text>
+        <text className="part" x={PANE_X + (igu ? -4 : 4)} y={H - 8} textAnchor="middle">{igu ? 'Existing double pane' : 'Existing pane'}</text>
 
         {/* retrofit glass */}
         {build.gap && (

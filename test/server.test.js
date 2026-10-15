@@ -93,6 +93,8 @@ test('config carries controls and the engine leakage values', async (t) => {
   const r = await s.get('/api/config')
   assert.equal(r.status, 200)
   assert.equal(r.json.glasses.length, 3)
+  assert.equal(r.json.existing.length, 2)
+  assert.equal(r.json.thermal.double.vig.estimate, true)
   assert.equal(r.json.seals_existing[0].engine.al_cfm_ft2, 0.005)
   assert.ok(!r.json.seals_existing.some((x) => x.key === 'hermetic'))
   assert.equal(r.json.presets_error, null)

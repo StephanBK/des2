@@ -1,6 +1,7 @@
 # HANDOVER: cavity fog outlook (des2)
 
-Last session: 2026-10-15. State: v2.0.0 (any address). Before that:
+Last session: 2026-10-15. State: v2.1.0 (any address, existing single or
+double pane). Before that:
 2026-09-29, v1.11.0. Repo StephanBK/des2 (Stephan's
 personal account), a copy of StephanBK/park277-desiccant with full history
 (up to v1.10.0, main ad19a79). des2 is identical to park277-desiccant in
@@ -16,6 +17,31 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.1.0 (2026-10-15): existing double pane as a standard option
+
+- Stephan: besides upgrading an old single pane, offer an existing double
+  pane as the starting point. Arnold will run WINDOW for the real values;
+  until then estimates, labeled as such in the app (note under the picker,
+  "(estimate)" in the glass tooltips) and later in the report.
+- New control "Existing glass" (URL ex=single|double, default single).
+  f_cold and u_ip now come from THERMAL[existing][retrofit] in
+  shared/scenario.js; the comment there carries the full derivation.
+- Spec sent to Arnold (2026-10-15): each retrofit 0.6 in behind an existing
+  IGU (1 in: 1/4 clear + 1/2 air + 1/4 clear, no low-e, unless he knows our
+  typical one); NFRC 100 winter; report f at the cavity side of the IGU's
+  inner pane, center of glass, and whole-assembly U on the same basis as
+  0.352/0.249/0.164; ideally rerun the 3 single-pane cases the same way.
+  To apply: replace THERMAL.double, set estimate: false, update the test
+  "each existing + retrofit pairing..." and delete the derivation test.
+- Estimates: f 0.291 / 0.190 / 0.074, U 0.249 / 0.193 / 0.138 (single /
+  double / VIG retrofit). Tested: physical ordering, and an independent
+  recomputation from the stated resistances.
+- Live engine, Chicago (233 S Wacker), wet/wet, no desiccant, 70 F / 30 %,
+  existing double pane: SWR 0 fog days/yr, SWR-IG 8, SWR-VIG 87 (VIG over
+  an existing single pane there: about 119 once the desiccant is full).
+- Drawing shows the existing unit as two lites with an air gap.
+- Tests 72 -> 75.
 
 ## v2.0.0 (2026-10-15): any address, with autocomplete
 
