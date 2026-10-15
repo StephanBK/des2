@@ -314,5 +314,37 @@ export function createEngineClient({
     return trimPayload(r.body, scenario, sent)
   }
 
-  return { run, presets }
+  /**
+   * Room-humidity sweep for the report's headroom chart: the scenario with
+   * NO desiccant, two years, fog days in year 2 (the settled year) at each
+   * room RH. That is the long-term state once any desiccant is spent.
+   * Returns [{ rh, fog_days }].
+   */
+  async function sweepRh(scenario, rhValues) {
+    const sent = engineParams({ ...scenario, lb: 0 })
+    delete sent.trace
+    delete sent.fog_map
+    delete sent.years_after_full
+    const p = await presets()
+    const q = `${toQuery(sent)}&x_key=rh_room&x_values=${rhValues.join(',')}&sweep_max_years=2`
+    const r = await getWithRetry(`${base}/api/sweep?${q}`, opts)
+    if (r.status !== 200 || !r.body) throw new HttpError(502, `The simulation engine's sweep answered ${r.status}`, r.body?.error || r.body)
+    // The echo carries the base inputs; the swept one (rh_in) varies per point.
+    const bad = []
+    for (const [k, v] of Object.entries(sent)) {
+      if (k === 'rh_in') continue
+      const ek = ECHO[k]
+      let expected = v
+      if (k === 'al_out' || k === 'al_in') expected = p?.[k]?.[v]
+      if (!same(expected, r.body.inputs?.[ek])) bad.push(`${k}: sent ${JSON.stringify(expected)}, engine used ${JSON.stringify(r.body.inputs?.[ek])}`)
+    }
+    const pts = r.body.points || []
+    if (r.body.x_key !== 'rh_room' || pts.length !== rhValues.length || pts.some((pt, i) => !same(pt.x, rhValues[i]))) {
+      bad.push('sweep: engine returned different humidity points than requested')
+    }
+    if (bad.length) throw new HttpError(502, 'The simulation engine used different inputs than requested in the humidity sweep', bad)
+    return pts.map((pt, i) => ({ rh: rhValues[i], fog_days: pt.fog_days_per_year }))
+  }
+
+  return { run, presets, sweepRh }
 }

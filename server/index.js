@@ -3,6 +3,8 @@
 // Serves the built page from dist/ and these API routes:
 //   GET /api/run?ex=&glass=&seal_out=&seal_in=&lb=&t=&rh=&addr=[&lat=&lon=]   one simulation
 //   GET /api/suggest?q=                                 address suggestions (Mapbox)
+//   GET /api/report?<run params>[&project=]             customer report, PDF
+//   GET /api/report.json?<run params>[&project=]        the same report's data
 //   GET /api/config                                     controls + preset values
 //   GET /health                                         always 200 while the app runs
 //   GET /health/engine                                  engine reachability
@@ -17,6 +19,8 @@ import { gzipSync } from 'node:zlib'
 
 import { coalescer, LruCache } from './cache.js'
 import { createEngineClient, HttpError, parseScenario, scenarioKey } from './engine.js'
+import { buildReportData, cleanProject } from './report-data.js'
+import { renderReportPdf } from './report-pdf.js'
 import { createSuggester } from './suggest.js'
 import {
   APP_VERSION, ASSUMPTIONS, DEFAULTS, ENGINE_DEFAULT_URL, EXISTING, FIXED_DESCRIPTION, GLASSES, RANGES, THERMAL,
@@ -63,24 +67,91 @@ export function createApp({
   engine = createEngineClient({ baseUrl: engineUrl }),
   cache = new LruCache({ max: 500 }),
   suggester = createSuggester(),
+  renderPdf = renderReportPdf,
   log = (...a) => console.log(new Date().toISOString(), ...a),
 } = {}) {
   const once = coalescer()
   const root = resolve(distDir)
 
-  async function runRoute(req, res, url) {
-    const scenario = parseScenario(url.searchParams)
+  // One simulation, cached and shared by identical requests in flight.
+  async function runCached(scenario) {
     const key = scenarioKey(scenario)
     const hit = cache.get(key)
-    if (hit) return sendJson(req, res, 200, { ...hit, cached: true })
-    const t0 = Date.now()
-    const out = await once(key, async () => {
+    if (hit) return hit
+    return once(key, async () => {
+      const t0 = Date.now()
       const r = await engine.run(scenario)
       cache.set(key, r)
+      log('run', key, `${Date.now() - t0} ms`)
       return r
     })
-    log('run', key, `${Date.now() - t0} ms`)
-    sendJson(req, res, 200, { ...out, cached: false, ms: Date.now() - t0 })
+  }
+
+  // Humidity sweeps ignore the desiccant (they run without it).
+  async function sweepCached(scenario, levels) {
+    const key = `sweep|${levels.join(',')}|${scenarioKey({ ...scenario, lb: 0 })}`
+    const hit = cache.get(key)
+    if (hit) return hit
+    return once(key, async () => {
+      const t0 = Date.now()
+      const r = await engine.sweepRh(scenario, levels)
+      cache.set(key, r)
+      log('sweep', key, `${Date.now() - t0} ms`)
+      return r
+    })
+  }
+
+  async function runRoute(req, res, url) {
+    const scenario = parseScenario(url.searchParams)
+    const was = cache.get(scenarioKey(scenario))
+    const t0 = Date.now()
+    const out = was ?? await runCached(scenario)
+    sendJson(req, res, 200, was ? { ...out, cached: true } : { ...out, cached: false, ms: Date.now() - t0 })
+  }
+
+  // The report takes the run parameters plus an optional project name.
+  function reportInputs(req, url) {
+    const params = new URLSearchParams(url.searchParams)
+    const project = cleanProject(params.get('project'))
+    params.delete('project')
+    const scenario = parseScenario(params)
+    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost'
+    const proto = req.headers['x-forwarded-proto'] || (/^(localhost|127\.)/.test(host) ? 'http' : 'https')
+    const q = new URLSearchParams()
+    for (const k of ['ex', 'glass', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']) {
+      if (scenario[k] !== null && scenario[k] !== undefined) q.set(k, String(scenario[k]))
+    }
+    return { scenario, project, key: `${scenarioKey(scenario)}|${project}`, appUrl: `${proto}://${host}/?${q}` }
+  }
+
+  async function reportData(req, url) {
+    const { scenario, project, key, appUrl } = reportInputs(req, url)
+    const data = await buildReportData(scenario, {
+      project, key, appUrl, runCached, sweepCached, presets: () => engine.presets(),
+    })
+    return { data, key }
+  }
+
+  async function reportJsonRoute(req, res, url) {
+    const { data } = await reportData(req, url)
+    sendJson(req, res, 200, data)
+  }
+
+  async function reportPdfRoute(req, res, url) {
+    const t0 = Date.now()
+    const { data, key } = await reportData(req, url)
+    const pkey = `pdf|${key}`
+    let pdf = cache.get(pkey)
+    if (!pdf) {
+      pdf = await renderPdf(data)
+      cache.set(pkey, pdf)
+    }
+    log('report', key, `${Date.now() - t0} ms`, `${pdf.length} bytes`)
+    const place = (data.site.matched || data.site.query).split(',')[0].replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
+    send(req, res, 200, pdf, 'application/pdf', {
+      'cache-control': 'no-store',
+      'content-disposition': `attachment; filename="INOVUES-cavity-assessment-${place || 'site'}-${data.id}.pdf"`,
+    })
   }
 
   async function suggestRoute(req, res, url) {
@@ -136,6 +207,8 @@ export function createApp({
       if (url.pathname === '/api/run') return await runRoute(req, res, url)
       if (url.pathname === '/api/config') return await configRoute(req, res)
       if (url.pathname === '/api/suggest') return await suggestRoute(req, res, url)
+      if (url.pathname === '/api/report') return await reportPdfRoute(req, res, url)
+      if (url.pathname === '/api/report.json') return await reportJsonRoute(req, res, url)
       if (url.pathname === '/health') return sendJson(req, res, 200, { ok: true, version: APP_VERSION, cached_results: cache.size })
       if (url.pathname === '/health/engine') {
         try { const p = await engine.presets(); return sendJson(req, res, 200, { ok: true, engine_version: p.version }) }

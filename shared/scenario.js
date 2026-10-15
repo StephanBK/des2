@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '2.1.0'
+export const APP_VERSION = '2.2.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
@@ -133,7 +133,7 @@ export const FIXED_DESCRIPTION = [
   ['Weather', 'Typical meteorological year for the site (NREL NSRDB), repeated every year.'],
   ['Start', 'Installation on January 1 with a fresh desiccant.'],
   ['Desiccant', '3A molecular sieve. It can release water again when warm (desorption on).'],
-  ['Sealant', 'Silicone beads on both layers; water vapour slowly diffuses through them.'],
+  ['Sealant', 'Silicone beads on both layers; water vapor slowly diffuses through them.'],
   ['Building pressure', '+5 Pa on weekdays 7 am to 7 pm, 0 Pa otherwise, plus stack and wind.'],
 ]
 

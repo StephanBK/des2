@@ -1,7 +1,7 @@
 # HANDOVER: cavity fog outlook (des2)
 
-Last session: 2026-10-15. State: v2.1.0 (any address, existing single or
-double pane). Before that:
+Last session: 2026-10-15. State: v2.2.0 (any address, existing single or
+double pane, customer PDF report). Before that:
 2026-09-29, v1.11.0. Repo StephanBK/des2 (Stephan's
 personal account), a copy of StephanBK/park277-desiccant with full history
 (up to v1.10.0, main ad19a79). des2 is identical to park277-desiccant in
@@ -17,6 +17,47 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.2.0 (2026-10-15): customer report (PDF)
+
+- Stephan: an export that summarizes the findings for a customer, highly
+  polished, with the address and the condensation days, plus anything that
+  makes INOVUES more credible. Decisions: PDF built on the server; include
+  the comparison of all 3 retrofit glasses AND humidity headroom.
+- Button "Customer report" in the header -> dialog with an optional project
+  or customer name (max 80 chars, on the cover) -> GET /api/report?<run
+  params>&project= -> PDF download. /api/report.json gives the same data.
+- 5 engine calls per report, all cached like page runs: the scenario, the
+  two other retrofit glasses, and per glass a room-RH sweep (/api/sweep,
+  x_key rh_room, 20..60 % in 5 % steps, no desiccant, 2 years, fog days in
+  year 2 = long term once any desiccant is spent). Sweep inputs are
+  echo-checked too. First report for a new address: about 15 to 20 s.
+- PDF: @react-pdf/renderer (pure Node, no browser on Railway), Archivo from
+  @fontsource/archivo (woff). server/report-data.js gathers and computes
+  (testable), server/report-pdf.js draws. 4 Letter pages:
+  1. summary: address, verdict, the 3 page cards, site and assembly tables,
+     all three glasses at a glance, ESTIMATE note for an existing double pane
+  2. calendar: 365 x 24 fog map of the reported year (same colours as the
+     page), fog stats incl. working hours, fog days by month, desiccant
+     loading curve, a fog-pattern sentence that follows the data
+  3. options table (U, f, life, first fog, fog days/yr, headroom), headroom
+     chart (3 glasses, this room's RH marked), site climate tiles
+  4. method in 6 steps, data and references, limits (incl. typical-year and
+     neighbouring-cell caveat, unmeasured seals, double-pane estimates,
+     summer heat on an existing IGU not modelled, failed IGUs out of scope,
+     not a warranty), assumptions, reproduce: report id (FNV-1a hash of the
+     inputs) + versions + a link that reopens the exact scenario
+- The font has no arrows or comparison signs: the PDF text uses words.
+- Layout headroom checked: worst case (estimates + long project name) still
+  4 pages; a test asserts 4 pages for the fake-engine report.
+- Live-engine examples (2026-10-15):
+  Chicago 233 S Wacker, existing single, VIG, 8 lb, 70 F / 30 %: dry
+  114 days, 119 fog days/yr once full; options SWR 84 / SWR-IG 113 /
+  SWR-VIG 119; all clear only up to 20 % RH. HDD65 6,059.
+  Boston 2 Liberty Sq, existing double, VIG, 4 lb, 70 F / 35 %: dry 84
+  days, 154 fog days/yr once full; options SWR 0 (clear up to 40 % RH) /
+  SWR-IG 39 (30 %) / SWR-VIG 154 (25 %).
+- Tests 75 -> 83.
 
 ## v2.1.0 (2026-10-15): existing double pane as a standard option
 
@@ -289,6 +330,12 @@ run" with the detail "engine returned no fog map": by design, not a crash.
   `.lane-bottom` (a shared `.top` once inflated the lanes).
 
 ## Open items
+
+- Arnold's WINDOW f and U for an existing double pane (spec in v2.1.0).
+- MAPBOX_TOKEN on the des2 Railway service (copy from the engine service)
+  turns on address suggestions.
+- Possible report extras: a location map (Mapbox static image), the
+  existing-single vs existing-double comparison, a cost line per option.
 
 - Desorption / cold-capacity: after the engine fix it no longer creates
   fog; kept on. Vendor 3A isotherm at 0 to 10 C would still sharpen it.

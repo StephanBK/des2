@@ -82,6 +82,17 @@ function lifetimePayload(q, opts) {
   return payload
 }
 
+// /api/sweep over room RH: the same input echo as a lifetime call, and
+// fog days that start above 25 % RH (so headroom is "clear up to 25 %").
+function sweepPayload(q, opts) {
+  const { inputs } = lifetimePayload(q, opts)
+  const xs = (q.get('x_values') || '').split(',').map(Number)
+  return {
+    mode: '1d', inputs, x_key: opts.sweepKey ?? q.get('x_key'), x_values: xs, sweep_max_years: Number(q.get('sweep_max_years')),
+    points: xs.map((x) => ({ x, fog_days_per_year: Math.max(0, Math.round((x - 25) * 4)), years_run: 2 })),
+  }
+}
+
 function response(status, body) {
   return { status, json: async () => body }
 }
@@ -94,9 +105,10 @@ function response(status, body) {
  *   down: true         every call throws (network error)
  *   hang: true         lifetime calls never answer (until aborted)
  *   far: true          geocoder lands 0.5 deg (55 km) north of the address
+ *   sweepKey: 'x'      sweep answers for a different swept input
  */
 export function fakeEngine(opts = {}) {
-  const calls = { presets: 0, lifetime: 0, urls: [] }
+  const calls = { presets: 0, lifetime: 0, sweep: 0, urls: [] }
   async function fetchImpl(url, init = {}) {
     const u = new URL(url)
     calls.urls.push(u)
@@ -112,6 +124,10 @@ export function fakeEngine(opts = {}) {
       if (opts.failFirst && calls.lifetime <= opts.failFirst) return response(503, { error: 'busy' })
       if (opts.delayMs) await new Promise((r) => setTimeout(r, opts.delayMs))
       return response(200, lifetimePayload(u.searchParams, opts))
+    }
+    if (u.pathname === '/api/sweep') {
+      calls.sweep++
+      return response(200, sweepPayload(u.searchParams, opts))
     }
     return response(404, { error: 'not found' })
   }

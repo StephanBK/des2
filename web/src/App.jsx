@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GLASSES, SEALS_EXISTING, SEALS_RETROFIT, WORKING_HOURS } from '../../shared/scenario.js'
 import { headlineCards, placeName, summarize } from '../../shared/story.js'
 import AddressBox from './AddressBox.jsx'
+import ReportDialog from './ReportDialog.jsx'
 import { fetchConfig, peek, queryOf, readUrlHours, readUrlScenario, runScenario, writeUrlScenario } from './api.js'
 import Assumptions from './Assumptions.jsx'
 import Cavity from './Cavity.jsx'
@@ -52,6 +53,7 @@ export default function App() {
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState(null)
   const [drawer, setDrawer] = useState(false)
+  const [report, setReport] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [hours, setHours] = useState(readUrlHours)
   const kind = useRef('button')
@@ -79,6 +81,7 @@ export default function App() {
     setScenario((s) => ({ ...s, ...patch }))
   }, [])
   const closeDrawer = useCallback(() => setDrawer(false), [])
+  const closeReport = useCallback(() => setReport(false), [])
 
   const r = error ? null : data?.result
   const workingView = hours === 'working'
@@ -102,7 +105,13 @@ export default function App() {
           <h1>Cavity fog outlook</h1>
           <p>Secondary window retrofit: how long the desiccant lasts, and when the pane fogs</p>
         </div>
-        <button type="button" className="ghost" onClick={() => setDrawer(true)}>Assumptions</button>
+        <div className="head-actions">
+          <button type="button" className="report-btn" onClick={() => setReport(true)} disabled={!!error || !data} aria-label="Customer report (PDF)">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z M9.5 1.5V5H13 M6.5 9.5 8.5 11.5 10.5 9.5 M8.5 7v4.3" /></svg>
+            <span className="report-label">Customer report</span>
+          </button>
+          <button type="button" className="ghost" onClick={() => setDrawer(true)}>Assumptions</button>
+        </div>
       </header>
 
       <section className="sitebar" aria-label="Site">
@@ -188,6 +197,8 @@ export default function App() {
       </main>
 
       <Assumptions open={drawer} onClose={closeDrawer} engineVersion={config?.engine_version} />
+      <ReportDialog open={report} onClose={closeReport} scenario={scenario}
+        siteLabel={(data?.engine?.site || scenario.addr).split(',').slice(0, 2).join(',')} />
     </div>
   )
 }
