@@ -30,3 +30,22 @@ test('link: u sits after the glass and is left out when empty', () => {
   const q = queryOf({ ...s, u: 0.3 })
   assert.match(q, /^ex=single&glass=vig&u=0\.3&seal_out=/)
 })
+
+test('cavity depth text: lenient, 2 decimals, null outside 0.25 to 4.00 in', async () => {
+  const { parseOffset } = await import('../web/src/api.js')
+  assert.equal(parseOffset('1'), 1)
+  assert.equal(parseOffset(' 1.5 '), 1.5)
+  assert.equal(parseOffset('.75'), 0.75)
+  assert.equal(parseOffset('1.256'), 1.26)
+  for (const bad of ['', null, '0.2', '4.1', 'x', '-1', '1,5']) assert.equal(parseOffset(bad), null, String(bad))
+})
+
+test('link: offset read back, 0.6 in left out, invalid falls back to 0.6', () => {
+  const site = `&addr=${encodeURIComponent(EXAMPLE_SITE.addr)}`
+  assert.equal(readUrlScenario(`?offset=1.25${site}`).offset, 1.25)
+  assert.equal(readUrlScenario(`?offset=9${site}`).offset, 0.6)
+  assert.equal(readUrlScenario(`?${site.slice(1)}`).offset, 0.6)
+  const s = { ...DEFAULTS, ...EXAMPLE_SITE }
+  assert.equal(new URLSearchParams(queryOf(s)).has('offset'), false, 'old links stay identical')
+  assert.match(queryOf({ ...s, offset: 2 }), /&glass=vig&offset=2&seal_out=/)
+})

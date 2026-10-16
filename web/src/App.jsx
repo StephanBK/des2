@@ -6,7 +6,7 @@ import ReportDialog from './ReportDialog.jsx'
 import { fetchConfig, peek, queryOf, readUrlHours, readUrlScenario, runScenario, writeUrlScenario } from './api.js'
 import Assumptions from './Assumptions.jsx'
 import Cavity from './Cavity.jsx'
-import { AssemblyBar, DesiccantSlider, dewPointF, RoomSliders, SealLadder } from './Controls.jsx'
+import { AssemblyBar, DesiccantSlider, dewPointF, OffsetField, RoomSliders, SealLadder } from './Controls.jsx'
 import FogCalendar, { Legend } from './FogCalendar.jsx'
 
 function ErrorPanel({ error, onRetry }) {
@@ -163,6 +163,7 @@ export default function App() {
               dewF={dewPointF(scenario.t, scenario.rh)} />
             <div className="under">
               <DesiccantSlider value={scenario.lb} onChange={(v) => update({ lb: v }, 'slider')} />
+              <OffsetField value={scenario.offset} onChange={(v) => update({ offset: v })} />
             </div>
           </div>
 

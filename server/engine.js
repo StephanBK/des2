@@ -10,7 +10,7 @@
 //   5. An engine without the fog-map API is reported as out of date.
 
 import {
-  ADDRESS, EXISTING, FIXED, GLASSES, GRAMS_PER_LB, normalizeU, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, U_INPUT, YEARS_AFTER_FULL,
+  ADDRESS, EXISTING, FIXED, GLASSES, GRAMS_PER_LB, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, U_INPUT, YEARS_AFTER_FULL,
 } from '../shared/scenario.js'
 
 export class HttpError extends Error {
@@ -21,7 +21,10 @@ export class HttpError extends Error {
   }
 }
 
-const CONTROLS = ['ex', 'glass', 'u', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+const CONTROLS = ['ex', 'glass', 'u', 'offset', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+// Optional controls and the value they take when absent; a scenario at that
+// value keeps its pre-v2.5 cache key and report id.
+const OPTIONAL = { u: null, offset: OFFSET_INPUT.default }
 
 function intInRange(name, raw, { min, max, step }) {
   if (raw === null || raw === undefined || raw === '') throw new HttpError(400, `Missing ${name}`)
@@ -60,6 +63,16 @@ function uValue(raw) {
   return v
 }
 
+/** Cavity depth in inches (v2.6): optional; absent or empty = 0.6 in. */
+function offsetValue(raw) {
+  if (raw === null || raw === undefined || raw === '') return OFFSET_INPUT.default
+  const re = new RegExp(`^\\d{1,2}(\\.\\d{1,${OFFSET_INPUT.decimals}})?$|^\\.\\d{1,${OFFSET_INPUT.decimals}}$`)
+  if (!re.test(raw)) throw new HttpError(400, `offset must be a number of inches with at most ${OFFSET_INPUT.decimals} decimals, got "${raw}"`)
+  const v = Number(raw)
+  if (v < OFFSET_INPUT.min || v > OFFSET_INPUT.max) throw new HttpError(400, `offset must be between ${OFFSET_INPUT.min.toFixed(2)} and ${OFFSET_INPUT.max.toFixed(2)} in, got ${v}`)
+  return v
+}
+
 function coord(name, raw, limit) {
   if (!/^-?\d{1,3}(\.\d{1,12})?$/.test(raw)) throw new HttpError(400, `${name} must be a number in degrees, got "${raw}"`)
   const v = Number(raw)
@@ -88,6 +101,7 @@ export function parseScenario(params) {
     ex,
     glass,
     u: normalizeU(ex, glass, uValue(params.get('u'))),
+    offset: offsetValue(params.get('offset')),
     seal_out: oneOf('seal_out', params.get('seal_out'), SEALS_EXISTING),
     seal_in: oneOf('seal_in', params.get('seal_in'), SEALS_RETROFIT),
     lb: intInRange('lb', params.get('lb'), RANGES.lb),
@@ -99,10 +113,11 @@ export function parseScenario(params) {
 }
 
 /** Canonical cache key: same scenario, same key, whatever the query order. */
-// A scenario without a typed U keeps the key it had before v2.5 (same cache
-// keys, same report ids).
+// Optional controls at their default (or missing) stay out of the key, so a
+// scenario without a typed U or a changed offset keeps the key it had before
+// v2.5 (same cache keys, same report ids).
 export function scenarioKey(s) {
-  return CONTROLS.filter((k) => k !== 'u' || (s.u !== null && s.u !== undefined))
+  return CONTROLS.filter((k) => !(k in OPTIONAL) || (s[k] !== undefined && s[k] !== OPTIONAL[k]))
     .map((k) => `${k}=${k === 'addr' ? s[k].toLowerCase() : s[k]}`).join('&')
 }
 
@@ -113,6 +128,7 @@ export function engineParams(s) {
   return {
     address: s.addr,
     ...FIXED,
+    offset_in: s.offset ?? OFFSET_INPUT.default,
     // Without desiccant nothing ever fills, so the engine would play all
     // max_years years. Two are enough: year 1 starts from a clean pane and
     // fresh cavity air (a start-up year, less fog); year 2 is the settled

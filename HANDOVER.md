@@ -1,7 +1,7 @@
 # HANDOVER: cavity fog outlook (des2)
 
-Last session: 2026-10-16. State: v2.5.0 (assembly U as a typed input, plus
-everything below: empty start, window assembly bar, existing single or
+Last session: 2026-10-16. State: v2.6.0 (cavity depth / offset as an input,
+assembly U as a typed input, plus everything below: empty start, window assembly bar, existing single or
 double pane with WINDOW f values, customer PDF report, 3 pages with a
 disclaimer). Before that: 2026-10-15, v2.4.1. Before that:
 2026-09-29, v1.11.0. Repo StephanBK/des2 (Stephan's
@@ -19,6 +19,44 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.6.0 (2026-10-16): cavity depth (offset) as an input
+
+- Stephan: make the 0.6 in offset a variable, 0.6 as the default, an input
+  field, and the drawing should change with it. Chosen after seeing the
+  live test below: build it now with an honest note, not wait for WINDOW
+  runs per offset.
+- FINDING (live engine, Boston 2 Liberty Sq, existing double, VIG,
+  70 F / 35 %): offset 0.6 / 1.0 / 2.0 in -> desiccant life (4 lb) 84 / 84 /
+  83 days, fog days/yr 157 / 158 / 159; no desiccant 162 / 163 / 167.
+  Why: in the engine the offset only sets cavity volume. Leak flow q per
+  ft2 of window does not depend on depth; ACH = q / offset, so water in per
+  hour = ACH x V x dw = (q / d)(A d) dw = q A dw: the depth cancels. f, U
+  and r_ip (0.97, the air-gap resistance) are NOT tied to the offset; they
+  are the 0.6 in WINDOW values. The real effect of depth would come through
+  those (and more desiccant fits a deeper cavity).
+- Inputs: scenario field offset (inches), URL/API param offset, optional,
+  0.25 to 4.00, 2 decimals (OFFSET_INPUT in shared/scenario.js); engine
+  offset_in from the scenario (removed from FIXED). Cache keys, report ids
+  and links are unchanged at 0.6 in (offset left out at the default).
+- Page: "Cavity depth" box under the drawing next to the desiccant slider,
+  same behaviour as the U box (Enter / leave runs it, Escape reverts, empty
+  or "Reset to 0.6 in"); helper line says f and U stay at their 0.6 in
+  values when changed. Assumptions drawer has the full explanation.
+- Drawing (web/src/Cavity.jsx gapPx): cavity width 186 px at 0.6 in, +33 px
+  per doubling (0.25 in 144 px, 4 in 276 px); 28 % of any change goes
+  outward, 72 % toward the room, so at 4 in the frame clears the site label
+  and the retrofit glass clears the room readings (measured in a headless
+  browser). Dimension line with arrows over the gap; label "Cavity, X in".
+- Report: page 1 Cavity row "X in; f and U as for 0.6 in" when changed;
+  page 3 footnote sentence. All 3 glasses' runs and sweeps use the offset.
+  Real-data check with a typed U + 2.25 in + long project name: 3 pages.
+- Bug fixed in both number boxes (also in v2.5.0's U box): Escape after a
+  bad value restored the number but left the box red, because the blur that
+  Escape triggers committed the stale draft. An escaped flag skips it.
+- Tests 95 -> 103.
+- To make depth matter for real: WINDOW runs per offset (e.g. 0.6, 1, 2,
+  3 in) per glass pairing from Arnold, then f, U and r_ip by offset.
 
 ## v2.5.0 (2026-10-16): assembly U-value as a prominent input
 
@@ -433,6 +471,8 @@ run" with the detail "engine returned no fog map": by design, not a crash.
 
 ## Open items
 
+- WINDOW runs per cavity depth (f, U, air-gap R by offset), so the offset
+  input (v2.6.0) changes glass temperatures, not just cavity volume.
 - Arnold's WINDOW U for an existing double pane (f done in v2.3.0; steps in
   v2.3.0 "To finish"). Until then a U can be typed in (v2.5.0).
 - MAPBOX_TOKEN on the des2 Railway service (copy from the engine service)

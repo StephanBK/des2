@@ -1,8 +1,8 @@
 // The page's side of /api/run and /api/config.
 
-import { ADDRESS, DEFAULTS, EXISTING, GLASSES, normalizeU, RANGES, SEALS_EXISTING, SEALS_RETROFIT, U_INPUT } from '../../shared/scenario.js'
+import { ADDRESS, DEFAULTS, EXISTING, GLASSES, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, U_INPUT } from '../../shared/scenario.js'
 
-const ORDER = ['ex', 'glass', 'u', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+const ORDER = ['ex', 'glass', 'u', 'offset', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
 
 export class ApiError extends Error {
   constructor(message, status, detail) {
@@ -13,9 +13,11 @@ export class ApiError extends Error {
 }
 
 // lat/lon are left out when the address was typed rather than picked.
-// An empty address (nothing entered yet) is left out too.
+// An empty address (nothing entered yet) is left out too, and so is the
+// standard 0.6 in offset, so links from before v2.6 stay the same.
 export function queryOf(s) {
-  return new URLSearchParams(ORDER.filter((k) => s[k] !== null && s[k] !== undefined && s[k] !== '').map((k) => [k, String(s[k])])).toString()
+  const keep = (k) => s[k] !== null && s[k] !== undefined && s[k] !== '' && !(k === 'offset' && s[k] === OFFSET_INPUT.default)
+  return new URLSearchParams(ORDER.filter(keep).map((k) => [k, String(s[k])])).toString()
 }
 
 // Recent results, so flipping back to a scenario is instant. Results never
@@ -84,6 +86,14 @@ export function parseU(raw) {
   return v >= U_INPUT.min && v <= U_INPUT.max ? v : null
 }
 
+/** Cavity depth text (the URL or the box), inches: rounded to 2 decimals; null when empty or invalid. */
+export function parseOffset(raw) {
+  const t = String(raw ?? '').trim()
+  if (!/^(\d{1,2}(\.\d*)?|\.\d+)$/.test(t)) return null
+  const v = Math.round(Number(t) * 10 ** OFFSET_INPUT.decimals) / 10 ** OFFSET_INPUT.decimals
+  return v >= OFFSET_INPUT.min && v <= OFFSET_INPUT.max ? v : null
+}
+
 function coord(raw, limit) {
   if (raw === null || !/^-?\d{1,3}(\.\d{1,12})?$/.test(raw)) return null
   const v = Number(raw)
@@ -108,6 +118,7 @@ export function readUrlScenario(search = window.location.search) {
     ex,
     glass,
     u: normalizeU(ex, glass, parseU(p.get('u'))),
+    offset: parseOffset(p.get('offset')) ?? OFFSET_INPUT.default,
     seal_out: pick(p.get('seal_out'), SEALS_EXISTING, DEFAULTS.seal_out),
     seal_in: pick(p.get('seal_in'), SEALS_RETROFIT, DEFAULTS.seal_in),
     lb: num(p.get('lb'), RANGES.lb, DEFAULTS.lb),

@@ -8,7 +8,7 @@
 //      (headroom: up to which room RH the pane stays clear long term)
 
 import {
-  APP_VERSION, ASSUMPTIONS, EXISTING, FIXED_DESCRIPTION, GLASSES, GRAMS_PER_LB, SEALS_EXISTING, SEALS_RETROFIT,
+  APP_VERSION, ASSUMPTIONS, EXISTING, FIXED_DESCRIPTION, GLASSES, GRAMS_PER_LB, OFFSET_INPUT, SEALS_EXISTING, SEALS_RETROFIT,
   thermalOf, WORKING_HOURS,
 } from '../shared/scenario.js'
 import {
@@ -138,6 +138,7 @@ export async function buildReportData(scenario, { project = '', runCached, sweep
       existing: { key: existing.key, label: existing.label },
       glass: { key: glass.key, label: glass.label, product: glass.product },
       thermal: th,
+      offset: { inches: scenario.offset ?? OFFSET_INPUT.default, standard: OFFSET_INPUT.default, changed: (scenario.offset ?? OFFSET_INPUT.default) !== OFFSET_INPUT.default },
       seal_out: sealInfo(SEALS_EXISTING, scenario.seal_out, p?.meta?.al_out),
       seal_in: sealInfo(SEALS_RETROFIT, scenario.seal_in, p?.meta?.al_in),
       lb: scenario.lb,

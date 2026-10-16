@@ -1,7 +1,7 @@
 // Cavity fog outlook (des2): web server.
 //
 // Serves the built page from dist/ and these API routes:
-//   GET /api/run?ex=&glass=[&u=]&seal_out=&seal_in=&lb=&t=&rh=&addr=[&lat=&lon=]   one simulation
+//   GET /api/run?ex=&glass=[&u=][&offset=]&seal_out=&seal_in=&lb=&t=&rh=&addr=[&lat=&lon=]   one simulation
 //   GET /api/suggest?q=                                 address suggestions (Mapbox)
 //   GET /api/report?<run params>[&project=]             customer report, PDF
 //   GET /api/report.json?<run params>[&project=]        the same report's data
@@ -23,7 +23,7 @@ import { buildReportData, cleanProject } from './report-data.js'
 import { renderReportPdf } from './report-pdf.js'
 import { createSuggester } from './suggest.js'
 import {
-  APP_VERSION, ASSUMPTIONS, DEFAULTS, ENGINE_DEFAULT_URL, EXISTING, FIXED_DESCRIPTION, GLASSES, RANGES, THERMAL,
+  APP_VERSION, ASSUMPTIONS, DEFAULTS, ENGINE_DEFAULT_URL, EXISTING, FIXED_DESCRIPTION, GLASSES, OFFSET_INPUT, RANGES, THERMAL,
   SEALS_EXISTING, SEALS_RETROFIT,
 } from '../shared/scenario.js'
 
@@ -118,7 +118,8 @@ export function createApp({
     const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost'
     const proto = req.headers['x-forwarded-proto'] || (/^(localhost|127\.)/.test(host) ? 'http' : 'https')
     const q = new URLSearchParams()
-    for (const k of ['ex', 'glass', 'u', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']) {
+    for (const k of ['ex', 'glass', 'u', 'offset', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']) {
+      if (k === 'offset' && scenario.offset === OFFSET_INPUT.default) continue
       if (scenario[k] !== null && scenario[k] !== undefined) q.set(k, String(scenario[k]))
     }
     return { scenario, project, key: `${scenarioKey(scenario)}|${project}`, appUrl: `${proto}://${host}/?${q}` }

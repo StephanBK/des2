@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '2.5.0'
+export const APP_VERSION = '2.6.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
@@ -71,6 +71,13 @@ export function thermalOf(existing, glass, u = null) {
   return { f_cold: t.f_cold, u_ip: u, u_estimate: false, u_entered: true, u_table: t.u_ip }
 }
 
+// v2.6 (Stephan 2026-10-16): cavity depth (offset) between the existing
+// glass and the retrofit is an input, 0.6 in by default (the value every f
+// and U above was computed for). In the engine the offset sets only the
+// cavity air volume; f, U and r_ip stay the 0.6 in values (said on the page
+// and in the report).
+export const OFFSET_INPUT = { min: 0.25, max: 4, decimals: 2, default: 0.6 }
+
 /** A typed U that equals the table value is no override: null, so links and caches stay clean. */
 export function normalizeU(existing, glass, u) {
   if (u === null || u === undefined) return null
@@ -120,14 +127,14 @@ export const SITE_TOL_DEG = 0.02            // about 2 km, the size of one weath
 // A known address for tests and examples only; never pre-filled on the page.
 export const EXAMPLE_SITE = { addr: '350 Fifth Avenue, New York, New York 10118, United States', lat: 40.74844, lon: -73.98566 }
 
-export const DEFAULTS = { ex: 'single', glass: 'vig', u: null, seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, addr: '', lat: null, lon: null }
+export const DEFAULTS = { ex: 'single', glass: 'vig', u: null, offset: OFFSET_INPUT.default, seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, addr: '', lat: null, lon: null }
 
 // Every hidden engine input is pinned explicitly (not left to engine
 // defaults), so an engine default change cannot move these results, and
 // every one of them is checked against the engine's echo.
 export const FIXED = {
   orientation: 'north',
-  width_in: 60, height_in: 96, offset_in: 0.6,
+  width_in: 60, height_in: 96,     // offset_in comes from the scenario (v2.6)
   r_ip: 0.97,                 // f_cold and u_ip come from THERMAL, not fixed
   desiccant: 'ms3a',
   desorption: true,
@@ -150,7 +157,7 @@ export const WORKING_HOURS = { start: 8, end: 18, days: 261, hours: 2610, label:
 // Plain-language list of what is fixed, for the assumptions drawer.
 export const FIXED_DESCRIPTION = [
   ['Building', 'North facade, so no sun warms the glass (the cautious case). Window at mid-height of a 20-story building, where the stack effect is close to zero.'],
-  ['Window', '60 × 96 in, 0.6 in cavity between the existing glass and the retrofit.'],
+  ['Window', '60 × 96 in. The cavity depth between the existing glass and the retrofit is an input, 0.6 in unless changed.'],
   ['Weather', 'Typical meteorological year for the site (NREL NSRDB), repeated every year.'],
   ['Start', 'Installation on January 1 with a fresh desiccant.'],
   ['Desiccant', '3A molecular sieve. It can release water again when warm (desorption on).'],
@@ -164,6 +171,7 @@ export const ASSUMPTIONS = [
   'With desorption on, the desiccant gives some water back when warm and takes it up again when cold, a small seasonal buffer: slightly less fog after it is full, and a longer life. The engine gives 3A no extra capacity below 25 °C; real 3A holds a few percent more when cold, so the results are on the cautious side here.',
   'After the desiccant is full, the pane fogs about as much as with no desiccant. What decides how much is the real air leakage of the wet seals, which has not been measured on an installed cavity.',
   'Each pairing of existing glass and retrofit glass has its own cavity-side temperature factor and assembly U-value (hover a glass button to see them). Over an existing single pane: from WINDOW and INOVUES. Over an existing double pane: f from WINDOW; U estimated from a layer-by-layer heat-flow model until WINDOW results replace it. A U typed into the U-value box replaces the table value for the chosen glass; f stays as listed, although in a real window the two move together.',
+  'The cavity depth changes only the cavity air volume in the simulation. The glass factor f, the U-value and the air-gap resistance are the values for a 0.6 in cavity, so a deeper or shallower cavity does not yet change the glass temperatures. Because air leaks in per square foot of window, not per cubic foot of cavity, depth alone has a small effect on fog.',
   '"Desiccant full" means 95 % of its capacity at 25 °C.',
   'The same typical weather year repeats; no climate trend or unusual years.',
 ]

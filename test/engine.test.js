@@ -356,3 +356,46 @@ test('typed U: the engine echo check covers it', async () => {
   const sent = f.calls.urls.find((u) => u.searchParams.has('u_ip'))
   assert.equal(sent.searchParams.get('u_ip'), '0.421')
 })
+
+// ------------------------------------------------------------ cavity depth (v2.6)
+
+test('offset: optional (0.6 in when absent), 2 decimals at most, 0.25 to 4.00 in', () => {
+  const o = (raw) => parseScenario(q({ ...BASE, offset: raw })).offset
+  assert.equal(parseScenario(q({ ...BASE, offset: null })).offset, 0.6, 'absent = 0.6 in')
+  assert.equal(o(''), 0.6)
+  assert.equal(o('1'), 1)
+  assert.equal(o('1.25'), 1.25)
+  assert.equal(o('.5'), 0.5)
+  assert.equal(o('0.25'), 0.25)
+  assert.equal(o('4.00'), 4)
+  for (const bad of ['0.24', '4.01', '10', '1.255', 'x', '-1', '1e0', ' 1']) {
+    assert.throws(() => o(bad), (e) => e instanceof HttpError && e.status === 400 && /^offset must/.test(e.message), bad)
+  }
+})
+
+test('offset reaches the engine as offset_in; f and U do not change with it', () => {
+  const a = engineParams(parseScenario(q(BASE)))
+  const b = engineParams(parseScenario(q({ ...BASE, offset: '2.5' })))
+  assert.equal(a.offset_in, 0.6)
+  assert.equal(b.offset_in, 2.5)
+  assert.equal(b.f_cold, a.f_cold)
+  assert.equal(b.u_ip, a.u_ip)
+  assert.equal(b.r_ip, a.r_ip)
+  assert.equal('offset_in' in FIXED, false, 'offset_in comes from the scenario, not FIXED')
+})
+
+test('cache key: unchanged at 0.6 in, different for another offset', () => {
+  const a = parseScenario(q(BASE))
+  const b = parseScenario(q({ ...BASE, offset: '0.6' }))
+  const c = parseScenario(q({ ...BASE, offset: '1.5' }))
+  assert.equal(scenarioKey(a), scenarioKey(b))
+  assert.equal(scenarioKey(a).includes('offset='), false, 'pre-v2.6 keys (and report ids) stay the same')
+  assert.notEqual(scenarioKey(a), scenarioKey(c))
+})
+
+test('offset: the engine echo check covers it', async () => {
+  const { f, c } = client()
+  await c.run(parseScenario(q({ ...BASE, offset: '1.75' })))
+  const sent = f.calls.urls.find((u) => u.searchParams.has('offset_in'))
+  assert.equal(sent.searchParams.get('offset_in'), '1.75')
+})

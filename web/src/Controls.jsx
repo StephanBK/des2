@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { EXISTING, GLASSES, glassTip, normalizeU, RANGES, thermalOf, U_INPUT } from '../../shared/scenario.js'
-import { parseU } from './api.js'
+import { EXISTING, GLASSES, glassTip, normalizeU, OFFSET_INPUT, RANGES, thermalOf, U_INPUT } from '../../shared/scenario.js'
+import { parseOffset, parseU } from './api.js'
 
 // Leak bar length on a log scale: the ladders span 0.005 to 2.0 cfm/ft2,
 // a factor of 400, so a linear bar would show everything but the last rung
@@ -139,10 +139,12 @@ function UField({ ex, glass, u, onU }) {
   const [text, setText] = useState(shown.toFixed(3))
   const [bad, setBad] = useState(false)
   const box = useRef(null)
+  const escaped = useRef(false)     // Escape blurs the box; that blur must not commit the old draft
   // A new value from outside (reset, switching glass, a link) replaces the draft.
   useEffect(() => { setText(shown.toFixed(3)); setBad(false) }, [shown])
 
   const commit = () => {
+    if (escaped.current) { escaped.current = false; return }
     if (text.trim() === '') { setBad(false); setText(std.u_ip.toFixed(3)); if (u !== null) onU(null); return }
     const v = parseU(text)
     if (v === null) { setBad(true); return }
@@ -156,14 +158,14 @@ function UField({ ex, glass, u, onU }) {
   return (
     <div className="asm-group asm-u">
       <h2 className="asm-title"><label htmlFor="u-in">Assembly U-value</label></h2>
-      <div className={`u-box${entered ? ' entered' : ''}${bad ? ' bad' : ''}`} onClick={() => box.current?.focus()}>
+      <div className={`num-box${entered ? ' entered' : ''}${bad ? ' bad' : ''}`} onClick={() => box.current?.focus()}>
         <input id="u-in" ref={box} type="text" inputMode="decimal" autoComplete="off" spellCheck="false"
           value={text} aria-invalid={bad} aria-describedby="u-help"
           onChange={(e) => { setText(e.target.value); setBad(false) }}
           onBlur={commit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') { e.preventDefault(); commit() }
-            if (e.key === 'Escape') { setText(shown.toFixed(3)); setBad(false); e.currentTarget.blur() }
+            if (e.key === 'Escape') { escaped.current = true; setText(shown.toFixed(3)); setBad(false); e.currentTarget.blur() }
           }} />
         <span className="u-unit">Btu/hr·ft²·°F</span>
       </div>
@@ -200,6 +202,57 @@ export function AssemblyBar({ ex, glass, u, onEx, onGlass, onU }) {
         detail={<>{g.label} retrofit<span className="asm-dot">·</span>glass factor f {t.f_cold.toFixed(3)}</>} />
       <UField ex={ex} glass={glass} u={u} onU={onU} />
     </div>
+  )
+}
+
+/**
+ * Cavity depth (v2.6): the gap between the existing glass and the retrofit,
+ * in inches. Same box behaviour as the U-value: Enter or leaving the box
+ * runs it, Escape reverts, empty or "Reset" returns to 0.6 in.
+ */
+export function OffsetField({ value, onChange }) {
+  const std = OFFSET_INPUT.default
+  const fmt = (v) => String(v)
+  const [text, setText] = useState(fmt(value))
+  const [bad, setBad] = useState(false)
+  const box = useRef(null)
+  const escaped = useRef(false)
+  useEffect(() => { setText(fmt(value)); setBad(false) }, [value])
+
+  const commit = () => {
+    if (escaped.current) { escaped.current = false; return }
+    if (text.trim() === '') { setBad(false); setText(fmt(std)); if (value !== std) onChange(std); return }
+    const v = parseOffset(text)
+    if (v === null) { setBad(true); return }
+    setBad(false)
+    setText(fmt(v))
+    if (v !== value) onChange(v)
+  }
+  const changed = value !== std
+  return (
+    <Group title="Cavity depth" hint="Existing glass to retrofit">
+      <div className="num-row">
+        <div className={`num-box small${changed ? ' entered' : ''}${bad ? ' bad' : ''}`} onClick={() => box.current?.focus()}>
+          <input id="offset-in" ref={box} type="text" inputMode="decimal" autoComplete="off" spellCheck="false"
+            value={text} aria-invalid={bad} aria-describedby="offset-help" aria-label="Cavity depth in inches"
+            onChange={(e) => { setText(e.target.value); setBad(false) }}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commit() }
+              if (e.key === 'Escape') { escaped.current = true; setText(fmt(value)); setBad(false); e.currentTarget.blur() }
+            }} />
+          <span className="u-unit">in</span>
+        </div>
+        {changed && !bad && <button type="button" className="u-reset" onClick={() => onChange(std)}>Reset to {fmt(std)} in</button>}
+      </div>
+      <p id="offset-help" className="num-help">
+        {bad
+          ? <span className="u-err">Enter {OFFSET_INPUT.min.toFixed(2)} to {OFFSET_INPUT.max.toFixed(2)} in</span>
+          : changed
+            ? `Changes the cavity air volume; f and U stay at their ${fmt(std)} in values.`
+            : `Standard ${fmt(std)} in · type a value and press Enter`}
+      </p>
+    </Group>
   )
 }
 

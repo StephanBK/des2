@@ -149,6 +149,28 @@ test('report PDF with a typed U still fits on 3 pages', async (t) => {
   assert.equal(pages, 3)
 })
 
+test('report with a changed offset: every glass and sweep uses it, the report says so', async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report.json?${qs({ offset: '1.5' })}`)
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.deepEqual(r.json.config.offset, { inches: 1.5, standard: 0.6, changed: true })
+  const engineCalls = s.f.calls.urls.filter((u) => u.searchParams.has('offset_in'))
+  assert.equal(engineCalls.length, 6, '3 runs + 3 sweeps')
+  assert.ok(engineCalls.every((u) => u.searchParams.get('offset_in') === '1.5'))
+  assert.equal(new URL(r.json.link).searchParams.get('offset'), '1.5')
+  const std = await s.get(`/api/report.json?${qs()}`)
+  assert.equal(std.json.config.offset.changed, false)
+  assert.equal(new URL(std.json.link).searchParams.has('offset'), false)
+})
+
+test('report PDF with a typed U and a changed offset still fits on 3 pages', async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report?${qs({ ex: 'double', glass: 'vig', u: '0.180', offset: '2.25' })}&project=${encodeURIComponent('Long project name '.repeat(4).trim())}`)
+  assert.equal(r.status, 200)
+  const pages = (r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length
+  assert.equal(pages, 3)
+})
+
 test('report: a sweep for the wrong input is refused, not drawn', async (t) => {
   const s = await start(t, { sweepKey: 'al_out' })
   const r = await s.get(`/api/report.json?${qs()}`)

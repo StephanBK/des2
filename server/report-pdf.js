@@ -104,6 +104,11 @@ function SectionTitle({ children, lead }) {
     lead ? h(Text, { style: { ...s.lead, marginBottom: 0 } }, lead) : null)
 }
 
+/** Inches as typed: 0.6 -> "0.6", 1.25 -> "1.25", 2 -> "2.0". */
+function fmtIn(x) {
+  return Number.isInteger(x) ? x.toFixed(1) : String(x)
+}
+
 function Tag({ text, tone = 'amber' }) {
   const t = tone === 'amber' ? { bg: C.amberSoft, fg: C.amberInk, bd: C.amber } : { bg: C.tealSoft, fg: C.tealInk, bd: C.teal }
   return h(Text, { style: { fontSize: 7, fontWeight: 600, color: t.fg, backgroundColor: t.bg, borderLeftWidth: 2, borderLeftColor: t.bd, paddingHorizontal: 4, paddingVertical: 1, marginLeft: 5 } }, text)
@@ -237,7 +242,7 @@ function SummaryPage({ data }) {
         h(KV, { k: 'Retrofit glass', v: `${cfg.glass.product} (${cfg.glass.label})` }),
         // U last, so the ESTIMATE tag sits right after the value it qualifies.
         h(KV, { k: 'Thermal values', v: `f ${cfg.thermal.f_cold.toFixed(3)}, U ${cfg.thermal.u_ip.toFixed(3)} Btu/hr·ft²·°F`, extra: est ? h(Tag, { text: 'ESTIMATE' }) : entered ? h(Tag, { text: 'ENTERED', tone: 'teal' }) : null }),
-        h(KV, { k: 'Cavity', v: '0.6 in between existing glass and retrofit' }),
+        h(KV, { k: 'Cavity', v: cfg.offset.changed ? `${fmtIn(cfg.offset.inches)} in; f and U as for ${fmtIn(cfg.offset.standard)} in` : `${fmtIn(cfg.offset.inches)} in between existing glass and retrofit` }),
         h(KV, { k: 'Existing seal', v: seal(cfg.seal_out) }),
         h(KV, { k: 'Retrofit seal', v: seal(cfg.seal_in) }),
         h(KV, { k: 'Desiccant', v: cfg.lb ? `${cfg.lb} lb (${cfg.grams.toLocaleString('en-US')} g) 3A molecular sieve` : 'None' }),
@@ -528,7 +533,7 @@ function OptionsPage({ data }) {
     h(SectionTitle, { lead: `The same site, existing ${data.config.existing.label.toLowerCase()}, seals, desiccant and room air, with each INOVUES retrofit glass.` }, 'Retrofit glass options'),
     h(OptionsTable, { data }),
     h(Text, { style: { ...s.small, marginTop: 5 } },
-      `Fog days per year are counted in the same simulation year as on page 1 for each option. ${est ? '* U estimated (existing double pane), pending a WINDOW result. ' : ''}${ent ? `Entered: ${ent.product} U typed in for this report (standard ${ent.thermal.u_table.toFixed(3)}); the other glasses use their standard U. ` : ''}Fewest fog days in this comparison: ${best.product}.`),
+      `Fog days per year are counted in the same simulation year as on page 1 for each option. ${est ? '* U estimated (existing double pane), pending a WINDOW result. ' : ''}${ent ? `Entered: ${ent.product} U typed in for this report (standard ${ent.thermal.u_table.toFixed(3)}); the other glasses use their standard U. ` : ''}${data.config.offset.changed ? `Cavity depth ${fmtIn(data.config.offset.inches)} in: it changes the cavity air volume only; f and U are the values for ${fmtIn(data.config.offset.standard)} in. ` : ''}Fewest fog days in this comparison: ${best.product}.`),
     h(Text, { style: { ...s.small, marginTop: 3 } },
       'Why a better-insulating retrofit can fog more: it keeps more heat in the room, so the existing glass in front of it runs colder. That is expected physics, not a defect; the seals and desiccant decide how much moisture reaches that cold glass.'),
 
