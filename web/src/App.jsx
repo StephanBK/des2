@@ -132,15 +132,6 @@ export default function App() {
 
         <section className={`answer-block${dim}`}>
           {error && <ErrorPanel error={error} onRetry={() => setAttempt((a) => a + 1)} />}
-          {!scenario.addr && (
-            <div className="empty-start">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" /></svg>
-              <div>
-                <p className="empty-title">Start with the building's address</p>
-                <p className="empty-sub">Type it in the box above and pick a suggestion. The weather for that site loads and the simulation runs. Set the window assembly first or after; every change re-runs.</p>
-              </div>
-            </div>
-          )}
           {scenario.addr && !error && !r && <div className="sk-line wide" aria-hidden="true" />}
           {r && (
             <>

@@ -102,54 +102,49 @@ function PaneIcon({ kind }) {
   )
 }
 
+/** One pill switch (a segmented control): the chosen option sits on a white pill. */
+function Switch({ label, options, value, onPick, detail, note }) {
+  return (
+    <div className="asm-group">
+      <h2 className="asm-title">{label}</h2>
+      <div className="asm-seg" role="radiogroup" aria-label={label}>
+        {options.map((o) => {
+          const on = value === o.key
+          return (
+            <button key={o.key} type="button" role="radio" aria-checked={on} className={`asm-opt${on ? ' on' : ''}`}
+              title={o.tip} onClick={() => onPick(o.key)}>
+              <PaneIcon kind={o.icon} />
+              <span>{o.name}</span>
+            </button>
+          )
+        })}
+      </div>
+      <p className="asm-detail">{detail}</p>
+      {note && <p className="asm-note">{note}</p>}
+    </div>
+  )
+}
+
 /**
  * The window assembly, prominent at the top: existing window (single or
- * double pane) and the INOVUES retrofit glass (SWR, SWR-IG, SWR-VIG).
- * 2 x 3 = 6 pairings, each with its own f and U (shared/scenario.js THERMAL).
+ * double pane) and the INOVUES retrofit glass (SWR, SWR-IG, SWR-VIG), as two
+ * separate switches. 2 x 3 = 6 pairings, each with its own f and U
+ * (shared/scenario.js THERMAL); the chosen pairing's values show under the
+ * retrofit switch.
  */
 export function AssemblyBar({ ex, glass, onEx, onGlass }) {
-  const anyEstimate = GLASSES.some((g) => thermalOf(ex, g.key).u_estimate)
+  const existing = EXISTING.find((x) => x.key === ex)
+  const g = GLASSES.find((x) => x.key === glass)
+  const t = thermalOf(ex, glass)
   return (
     <div className="assembly" role="group" aria-label="Window assembly">
-      <div className="asm-group">
-        <h2 className="asm-title">Existing window</h2>
-        <div className="asm-seg" role="radiogroup" aria-label="Existing window">
-          {EXISTING.map((x) => {
-            const on = ex === x.key
-            return (
-              <button key={x.key} type="button" role="radio" aria-checked={on} className={`asm-opt${on ? ' on' : ''}`}
-                data-tip={x.tip} onClick={() => onEx(x.key)}>
-                <PaneIcon kind={`ex-${x.key}`} />
-                <span className="asm-text">
-                  <span className="asm-name">{x.label}</span>
-                  <span className="asm-sub">{x.key === 'single' ? 'One lite of glass' : 'Insulating glass unit'}</span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-      <div className="asm-plus" aria-hidden="true">+</div>
-      <div className="asm-group asm-grow">
-        <h2 className="asm-title">INOVUES retrofit glass</h2>
-        <div className="asm-seg" role="radiogroup" aria-label="INOVUES retrofit glass">
-          {GLASSES.map((g) => {
-            const on = glass === g.key
-            const t = thermalOf(ex, g.key)
-            return (
-              <button key={g.key} type="button" role="radio" aria-checked={on} className={`asm-opt${on ? ' on' : ''}`}
-                data-tip={glassTip(ex, g.key)} onClick={() => onGlass(g.key)}>
-                <PaneIcon kind={`rt-${g.key}`} />
-                <span className="asm-text">
-                  <span className="asm-name">{g.product}</span>
-                  <span className="asm-sub">{g.label} · U {t.u_ip.toFixed(3)}{t.u_estimate ? '*' : ''}</span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
-        {anyEstimate && <p className="asm-note">* U over an existing double pane is an estimate until WINDOW results replace it.</p>}
-      </div>
+      <Switch label="Existing window" value={ex} onPick={onEx}
+        options={EXISTING.map((x) => ({ key: x.key, name: x.label, icon: `ex-${x.key}`, tip: x.tip }))}
+        detail={existing.key === 'single' ? 'One lite of glass' : 'Insulating glass unit, 1 in overall'} />
+      <Switch label="INOVUES retrofit glass" value={glass} onPick={onGlass}
+        options={GLASSES.map((x) => ({ key: x.key, name: x.product, icon: `rt-${x.key}`, tip: glassTip(ex, x.key) }))}
+        detail={<>{g.label} retrofit<span className="asm-dot">·</span>U {t.u_ip.toFixed(3)} Btu/hr·ft²·°F{t.u_estimate ? '*' : ''}<span className="asm-dot">·</span>f {t.f_cold.toFixed(3)}</>}
+        note={t.u_estimate ? '* Estimate until the WINDOW U-value for an existing double pane is in.' : null} />
     </div>
   )
 }

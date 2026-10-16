@@ -21,6 +21,14 @@ run" with the detail "engine returned no fog map": by design, not a crash.
 
 ## v2.4.0 (2026-10-15 evening): empty start, window assembly bar
 
+- v2.4.1 (same evening): Stephan had the "Start with the building's
+  address" card removed (the small hint beside the address box stays) and
+  the assembly made sleeker and more separated: two pill switches
+  (segmented controls) with a divider between them, names only on the
+  buttons; the chosen option's details on one line under each switch
+  (existing: one lite / IGU; retrofit: label, U, f, with "*" and a note
+  while U is an estimate). On phones the switches go full width.
+
 - Stephan: no default address; desiccant default 0; an easy, prominent
   single/double toggle for the existing window that changes the drawing;
   the 3 retrofit glasses as a toggle, each with its own U; 6 combinations

@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '2.4.0'
+export const APP_VERSION = '2.4.1'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
