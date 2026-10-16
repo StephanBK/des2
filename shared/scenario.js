@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '2.4.1'
+export const APP_VERSION = '2.5.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
@@ -56,10 +56,25 @@ export const THERMAL = {
   },
 }
 
-export function thermalOf(existing, glass) {
+// v2.5 (Stephan 2026-10-16): the assembly U is a prominent input. Empty =
+// the table value above for the chosen pairing; a typed U replaces it for
+// the chosen retrofit glass only (the report's other two glasses keep their
+// table values). f stays from the table. Switching the existing window or
+// the retrofit glass clears a typed U.
+export const U_INPUT = { min: 0.05, max: 1.2, decimals: 3 }
+
+/** f and U for a pairing; with a typed U (a number), that U replaces the table value. */
+export function thermalOf(existing, glass, u = null) {
   const t = THERMAL[existing]?.[glass]
   if (!t) throw new RangeError(`no thermal values for existing ${existing}, glass ${glass}`)
-  return t
+  if (u === null || u === undefined) return t
+  return { f_cold: t.f_cold, u_ip: u, u_estimate: false, u_entered: true, u_table: t.u_ip }
+}
+
+/** A typed U that equals the table value is no override: null, so links and caches stay clean. */
+export function normalizeU(existing, glass, u) {
+  if (u === null || u === undefined) return null
+  return Math.abs(u - thermalOf(existing, glass).u_ip) < 0.0005 ? null : u
 }
 
 /** Tooltip for a retrofit glass over a given existing glass. */
@@ -105,7 +120,7 @@ export const SITE_TOL_DEG = 0.02            // about 2 km, the size of one weath
 // A known address for tests and examples only; never pre-filled on the page.
 export const EXAMPLE_SITE = { addr: '350 Fifth Avenue, New York, New York 10118, United States', lat: 40.74844, lon: -73.98566 }
 
-export const DEFAULTS = { ex: 'single', glass: 'vig', seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, addr: '', lat: null, lon: null }
+export const DEFAULTS = { ex: 'single', glass: 'vig', u: null, seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, addr: '', lat: null, lon: null }
 
 // Every hidden engine input is pinned explicitly (not left to engine
 // defaults), so an engine default change cannot move these results, and
@@ -148,7 +163,7 @@ export const ASSUMPTIONS = [
   '"Wet-sealed" is the ASTM E283 detection floor (0.005 cfm/ft² at 75 Pa), not a measurement of an installed INOVUES seal. A pressure test on an installed cavity would replace it.',
   'With desorption on, the desiccant gives some water back when warm and takes it up again when cold, a small seasonal buffer: slightly less fog after it is full, and a longer life. The engine gives 3A no extra capacity below 25 °C; real 3A holds a few percent more when cold, so the results are on the cautious side here.',
   'After the desiccant is full, the pane fogs about as much as with no desiccant. What decides how much is the real air leakage of the wet seals, which has not been measured on an installed cavity.',
-  'Each pairing of existing glass and retrofit glass has its own cavity-side temperature factor and assembly U-value (hover a glass button to see them). Over an existing single pane: from WINDOW and INOVUES. Over an existing double pane: f from WINDOW; U estimated from a layer-by-layer heat-flow model until WINDOW results replace it.',
+  'Each pairing of existing glass and retrofit glass has its own cavity-side temperature factor and assembly U-value (hover a glass button to see them). Over an existing single pane: from WINDOW and INOVUES. Over an existing double pane: f from WINDOW; U estimated from a layer-by-layer heat-flow model until WINDOW results replace it. A U typed into the U-value box replaces the table value for the chosen glass; f stays as listed, although in a real window the two move together.',
   '"Desiccant full" means 95 % of its capacity at 25 °C.',
   'The same typical weather year repeats; no climate trend or unusual years.',
 ]

@@ -1,4 +1,6 @@
-import { EXISTING, GLASSES, glassTip, RANGES, thermalOf } from '../../shared/scenario.js'
+import { useEffect, useRef, useState } from 'react'
+import { EXISTING, GLASSES, glassTip, normalizeU, RANGES, thermalOf, U_INPUT } from '../../shared/scenario.js'
+import { parseU } from './api.js'
 
 // Leak bar length on a log scale: the ladders span 0.005 to 2.0 cfm/ft2,
 // a factor of 400, so a linear bar would show everything but the last rung
@@ -126,13 +128,65 @@ function Switch({ label, options, value, onPick, detail, note }) {
 }
 
 /**
+ * The assembly U-value box (v2.5): shows the U in use for the chosen pairing.
+ * Typing a number and pressing Enter (or leaving the box) runs it; an empty
+ * box or "Reset" goes back to the standard value. The draft text lives here,
+ * so the simulation runs once per value, not once per keystroke.
+ */
+function UField({ ex, glass, u, onU }) {
+  const std = thermalOf(ex, glass)
+  const shown = u ?? std.u_ip
+  const [text, setText] = useState(shown.toFixed(3))
+  const [bad, setBad] = useState(false)
+  const box = useRef(null)
+  // A new value from outside (reset, switching glass, a link) replaces the draft.
+  useEffect(() => { setText(shown.toFixed(3)); setBad(false) }, [shown])
+
+  const commit = () => {
+    if (text.trim() === '') { setBad(false); setText(std.u_ip.toFixed(3)); if (u !== null) onU(null); return }
+    const v = parseU(text)
+    if (v === null) { setBad(true); return }
+    setBad(false)
+    setText(v.toFixed(3))
+    const next = normalizeU(ex, glass, v)
+    if (next !== u) onU(next)
+  }
+  const entered = u !== null
+  const g = GLASSES.find((x) => x.key === glass)
+  return (
+    <div className="asm-group asm-u">
+      <h2 className="asm-title"><label htmlFor="u-in">Assembly U-value</label></h2>
+      <div className={`u-box${entered ? ' entered' : ''}${bad ? ' bad' : ''}`} onClick={() => box.current?.focus()}>
+        <input id="u-in" ref={box} type="text" inputMode="decimal" autoComplete="off" spellCheck="false"
+          value={text} aria-invalid={bad} aria-describedby="u-help"
+          onChange={(e) => { setText(e.target.value); setBad(false) }}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit() }
+            if (e.key === 'Escape') { setText(shown.toFixed(3)); setBad(false); e.currentTarget.blur() }
+          }} />
+        <span className="u-unit">Btu/hr·ft²·°F</span>
+      </div>
+      <p id="u-help" className="asm-detail">
+        {bad
+          ? <span className="u-err">Enter a value from {U_INPUT.min.toFixed(3)} to {U_INPUT.max.toFixed(3)}</span>
+          : entered
+            ? <>Entered<span className="asm-dot">·</span>standard {std.u_ip.toFixed(3)}{std.u_estimate ? '*' : ''}<button type="button" className="u-reset" onClick={() => onU(null)}>Reset</button></>
+            : <>Standard for {g.product}{std.u_estimate ? '*' : ''}<span className="asm-dot">·</span>type a value and press Enter</>}
+      </p>
+      {std.u_estimate && !entered && <p className="asm-note">* Estimate until the WINDOW U-value for an existing double pane is in.</p>}
+    </div>
+  )
+}
+
+/**
  * The window assembly, prominent at the top: existing window (single or
  * double pane) and the INOVUES retrofit glass (SWR, SWR-IG, SWR-VIG), as two
  * separate switches. 2 x 3 = 6 pairings, each with its own f and U
- * (shared/scenario.js THERMAL); the chosen pairing's values show under the
- * retrofit switch.
+ * (shared/scenario.js THERMAL); f shows under the retrofit switch, U in its
+ * own box beside it (v2.5), where a different U can be typed in.
  */
-export function AssemblyBar({ ex, glass, onEx, onGlass }) {
+export function AssemblyBar({ ex, glass, u, onEx, onGlass, onU }) {
   const existing = EXISTING.find((x) => x.key === ex)
   const g = GLASSES.find((x) => x.key === glass)
   const t = thermalOf(ex, glass)
@@ -143,8 +197,8 @@ export function AssemblyBar({ ex, glass, onEx, onGlass }) {
         detail={existing.key === 'single' ? 'One lite of glass' : 'Insulating glass unit, 1 in overall'} />
       <Switch label="INOVUES retrofit glass" value={glass} onPick={onGlass}
         options={GLASSES.map((x) => ({ key: x.key, name: x.product, icon: `rt-${x.key}`, tip: glassTip(ex, x.key) }))}
-        detail={<>{g.label} retrofit<span className="asm-dot">·</span>U {t.u_ip.toFixed(3)} Btu/hr·ft²·°F{t.u_estimate ? '*' : ''}<span className="asm-dot">·</span>f {t.f_cold.toFixed(3)}</>}
-        note={t.u_estimate ? '* Estimate until the WINDOW U-value for an existing double pane is in.' : null} />
+        detail={<>{g.label} retrofit<span className="asm-dot">·</span>glass factor f {t.f_cold.toFixed(3)}</>} />
+      <UField ex={ex} glass={glass} u={u} onU={onU} />
     </div>
   )
 }

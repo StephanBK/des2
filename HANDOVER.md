@@ -1,8 +1,9 @@
 # HANDOVER: cavity fog outlook (des2)
 
-Last session: 2026-10-15. State: v2.4.0 (empty start, window assembly bar,
-existing single or double pane with WINDOW f values, customer PDF report,
-3 pages with a disclaimer). Before that:
+Last session: 2026-10-16. State: v2.5.0 (assembly U as a typed input, plus
+everything below: empty start, window assembly bar, existing single or
+double pane with WINDOW f values, customer PDF report, 3 pages with a
+disclaimer). Before that: 2026-10-15, v2.4.1. Before that:
 2026-09-29, v1.11.0. Repo StephanBK/des2 (Stephan's
 personal account), a copy of StephanBK/park277-desiccant with full history
 (up to v1.10.0, main ad19a79). des2 is identical to park277-desiccant in
@@ -18,6 +19,43 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.5.0 (2026-10-16): assembly U-value as a prominent input
+
+- Stephan: while Arnold's double-pane U values are pending, make U a
+  prominent input field in general. Decisions: a typed U resets when the
+  existing window or retrofit glass is switched; range 0.050 to 1.200
+  Btu/hr.ft2.F, 3 decimals; in the report the typed U applies to the chosen
+  glass only, the other two keep their table U, and it is marked "entered".
+- Page: third group "Assembly U-value" in the assembly bar (UField in
+  web/src/Controls.jsx), a large number box pre-filled with the table U for
+  the pairing; Enter or leaving the box runs it, Escape reverts, empty or
+  "Reset" returns to the table value. Teal box = entered; red = out of
+  range (nothing runs). The retrofit switch's detail line now shows f only.
+  The three groups sit on one line from 970 px; below 960 px they stack.
+- Model: scenario field u (null = table value). URL/API param u, optional,
+  server-validated (U_INPUT in shared/scenario.js); a typed U equal to the
+  table value normalizes to null (normalizeU). thermalOf(ex, glass, u)
+  returns { f_cold, u_ip: u, u_estimate: false, u_entered: true, u_table }.
+  f is never changed by a typed U (simplification: in reality f and U move
+  together; the assumptions drawer says so).
+- scenarioKey leaves u out when null, so pre-v2.5 cache keys and report ids
+  are unchanged.
+- Report: "ENTERED" tag after U on page 1 plus a one-line teal note with
+  the standard value; options table shows "ENTERED" under the chosen
+  glass's U and a footnote. Other glasses' runs and sweeps are sent u null
+  (tested against what the fake engine actually received).
+- Live check, Boston 2 Liberty Sq, existing double, VIG, 4 lb, 70 F / 35 %:
+  U 0.138 (standard) -> 0.300 typed: fog days/yr 157 -> 154, desiccant life
+  84 -> 85 days. U moves the retrofit side of the cavity, not the existing
+  glass where fog forms (f), so its effect on fog is small.
+- PDF page-1 room: a two-line note pushed real-data page 1 to 2 pages (the
+  fake-engine test still showed 3); the note is one line now. Checked on
+  real data: Boston and Chicago with a long project name, 3 pages each.
+- Tests 85 -> 95 (test/url.test.js new). Test helpers now leave null values
+  out of query strings, as the page does.
+- When Arnold's U values arrive: v2.3.0's "To finish" steps still apply;
+  the U box then simply pre-fills with the WINDOW values.
 
 ## v2.4.0 (2026-10-15 evening): empty start, window assembly bar
 
@@ -395,7 +433,8 @@ run" with the detail "engine returned no fog map": by design, not a crash.
 
 ## Open items
 
-- Arnold's WINDOW f and U for an existing double pane (spec in v2.1.0).
+- Arnold's WINDOW U for an existing double pane (f done in v2.3.0; steps in
+  v2.3.0 "To finish"). Until then a U can be typed in (v2.5.0).
 - MAPBOX_TOKEN on the des2 Railway service (copy from the engine service)
   turns on address suggestions.
 - Possible report extras: a location map (Mapbox static image), the

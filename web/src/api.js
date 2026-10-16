@@ -1,8 +1,8 @@
 // The page's side of /api/run and /api/config.
 
-import { ADDRESS, DEFAULTS, EXISTING, GLASSES, RANGES, SEALS_EXISTING, SEALS_RETROFIT } from '../../shared/scenario.js'
+import { ADDRESS, DEFAULTS, EXISTING, GLASSES, normalizeU, RANGES, SEALS_EXISTING, SEALS_RETROFIT, U_INPUT } from '../../shared/scenario.js'
 
-const ORDER = ['ex', 'glass', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+const ORDER = ['ex', 'glass', 'u', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
 
 export class ApiError extends Error {
   constructor(message, status, detail) {
@@ -73,6 +73,17 @@ function num(raw, { min, max, step }, fallback) {
   return v >= min && v <= max && (v - min) % step === 0 ? v : fallback
 }
 
+/**
+ * A typed U from text (the URL or the U box): a number in U_INPUT's range,
+ * rounded to its decimals; null when empty or invalid.
+ */
+export function parseU(raw) {
+  const t = String(raw ?? '').trim()
+  if (!/^(\d{1,2}(\.\d*)?|\.\d+)$/.test(t)) return null
+  const v = Math.round(Number(t) * 10 ** U_INPUT.decimals) / 10 ** U_INPUT.decimals
+  return v >= U_INPUT.min && v <= U_INPUT.max ? v : null
+}
+
 function coord(raw, limit) {
   if (raw === null || !/^-?\d{1,3}(\.\d{1,12})?$/.test(raw)) return null
   const v = Number(raw)
@@ -91,9 +102,12 @@ function urlSite(p) {
 /** Scenario from the address bar; anything invalid falls back to the default. */
 export function readUrlScenario(search = window.location.search) {
   const p = new URLSearchParams(search)
+  const ex = pick(p.get('ex'), EXISTING, DEFAULTS.ex)
+  const glass = pick(p.get('glass'), GLASSES, DEFAULTS.glass)
   return {
-    ex: pick(p.get('ex'), EXISTING, DEFAULTS.ex),
-    glass: pick(p.get('glass'), GLASSES, DEFAULTS.glass),
+    ex,
+    glass,
+    u: normalizeU(ex, glass, parseU(p.get('u'))),
     seal_out: pick(p.get('seal_out'), SEALS_EXISTING, DEFAULTS.seal_out),
     seal_in: pick(p.get('seal_in'), SEALS_RETROFIT, DEFAULTS.seal_in),
     lb: num(p.get('lb'), RANGES.lb, DEFAULTS.lb),

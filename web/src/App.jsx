@@ -122,8 +122,9 @@ export default function App() {
           <AddressBox value={scenario.addr} suggestOn={config ? config.suggest : undefined}
             onPick={(site) => update(site)} />
           <SiteFacts data={error ? null : data} scenario={scenario} busy={busy} />
-          <AssemblyBar ex={scenario.ex} glass={scenario.glass}
-            onEx={(k) => update({ ex: k })} onGlass={(k) => update({ glass: k })} />
+          <AssemblyBar ex={scenario.ex} glass={scenario.glass} u={scenario.u}
+            onEx={(k) => update({ ex: k, u: null })} onGlass={(k) => update({ glass: k, u: null })}
+            onU={(v) => update({ u: v })} />
         </div>
       </section>
 

@@ -97,11 +97,13 @@ function summaryOf(r) {
  */
 export async function buildReportData(scenario, { project = '', runCached, sweepCached, presets, key, appUrl, now = new Date() }) {
   const others = GLASSES.filter((g) => g.key !== scenario.glass)
+  // A typed U belongs to the chosen glass only; the other two use their table U.
+  const asGlass = (gk) => (gk === scenario.glass ? scenario : { ...scenario, glass: gk, u: null })
   const [main, p, ...rest] = await Promise.all([
     runCached(scenario),
     presets().catch(() => null),
-    ...others.map((g) => runCached({ ...scenario, glass: g.key })),
-    ...GLASSES.map((g) => sweepCached({ ...scenario, glass: g.key }, RH_LEVELS)),
+    ...others.map((g) => runCached(asGlass(g.key))),
+    ...GLASSES.map((g) => sweepCached(asGlass(g.key), RH_LEVELS)),
   ])
   const otherRuns = rest.slice(0, others.length)
   const sweeps = rest.slice(others.length)
@@ -113,7 +115,7 @@ export async function buildReportData(scenario, { project = '', runCached, sweep
   const workStats = yearStats(lastYear?.fog, true)
   const glass = GLASSES.find((g) => g.key === scenario.glass)
   const existing = EXISTING.find((x) => x.key === scenario.ex)
-  const th = thermalOf(scenario.ex, scenario.glass)
+  const th = thermalOf(scenario.ex, scenario.glass, scenario.u ?? null)
 
   return {
     id: reportId(key),
@@ -168,7 +170,7 @@ export async function buildReportData(scenario, { project = '', runCached, sweep
         label: g.label,
         product: g.product,
         selected: g.key === scenario.glass,
-        thermal: thermalOf(scenario.ex, g.key),
+        thermal: g.key === scenario.glass ? th : thermalOf(scenario.ex, g.key),
         ...summaryOf(run.result),
         sweep: sweeps[i],
         headroom: headroomOf(sweeps[i]),

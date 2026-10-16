@@ -10,7 +10,7 @@
 //   5. An engine without the fog-map API is reported as out of date.
 
 import {
-  ADDRESS, EXISTING, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, YEARS_AFTER_FULL,
+  ADDRESS, EXISTING, FIXED, GLASSES, GRAMS_PER_LB, normalizeU, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, U_INPUT, YEARS_AFTER_FULL,
 } from '../shared/scenario.js'
 
 export class HttpError extends Error {
@@ -21,7 +21,7 @@ export class HttpError extends Error {
   }
 }
 
-const CONTROLS = ['ex', 'glass', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+const CONTROLS = ['ex', 'glass', 'u', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
 
 function intInRange(name, raw, { min, max, step }) {
   if (raw === null || raw === undefined || raw === '') throw new HttpError(400, `Missing ${name}`)
@@ -50,6 +50,16 @@ export function cleanAddress(raw) {
   return v
 }
 
+/** Typed assembly U (v2.5): optional; absent or empty = the table value. */
+function uValue(raw) {
+  if (raw === null || raw === undefined || raw === '') return null
+  const re = new RegExp(`^\\d{1,2}(\\.\\d{1,${U_INPUT.decimals}})?$|^\\.\\d{1,${U_INPUT.decimals}}$`)
+  if (!re.test(raw)) throw new HttpError(400, `u must be a number with at most ${U_INPUT.decimals} decimals, got "${raw}"`)
+  const v = Number(raw)
+  if (v < U_INPUT.min || v > U_INPUT.max) throw new HttpError(400, `u must be between ${U_INPUT.min.toFixed(3)} and ${U_INPUT.max.toFixed(3)} Btu/hr.ft2.F, got ${v}`)
+  return v
+}
+
 function coord(name, raw, limit) {
   if (!/^-?\d{1,3}(\.\d{1,12})?$/.test(raw)) throw new HttpError(400, `${name} must be a number in degrees, got "${raw}"`)
   const v = Number(raw)
@@ -72,9 +82,12 @@ export function parseScenario(params) {
   for (const k of params.keys()) {
     if (!CONTROLS.includes(k)) throw new HttpError(400, `Unknown parameter "${k}"`)
   }
+  const ex = oneOf('ex', params.get('ex'), EXISTING)
+  const glass = oneOf('glass', params.get('glass'), GLASSES)
   return {
-    ex: oneOf('ex', params.get('ex'), EXISTING),
-    glass: oneOf('glass', params.get('glass'), GLASSES),
+    ex,
+    glass,
+    u: normalizeU(ex, glass, uValue(params.get('u'))),
     seal_out: oneOf('seal_out', params.get('seal_out'), SEALS_EXISTING),
     seal_in: oneOf('seal_in', params.get('seal_in'), SEALS_RETROFIT),
     lb: intInRange('lb', params.get('lb'), RANGES.lb),
@@ -86,13 +99,16 @@ export function parseScenario(params) {
 }
 
 /** Canonical cache key: same scenario, same key, whatever the query order. */
+// A scenario without a typed U keeps the key it had before v2.5 (same cache
+// keys, same report ids).
 export function scenarioKey(s) {
-  return CONTROLS.map((k) => `${k}=${k === 'addr' ? s[k].toLowerCase() : s[k]}`).join('&')
+  return CONTROLS.filter((k) => k !== 'u' || (s.u !== null && s.u !== undefined))
+    .map((k) => `${k}=${k === 'addr' ? s[k].toLowerCase() : s[k]}`).join('&')
 }
 
 /** Full engine query for a scenario. */
 export function engineParams(s) {
-  const th = thermalOf(s.ex, s.glass)
+  const th = thermalOf(s.ex, s.glass, s.u ?? null)
   const grams = Math.round(s.lb * GRAMS_PER_LB * 1000) / 1000
   return {
     address: s.addr,

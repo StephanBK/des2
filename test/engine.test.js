@@ -10,7 +10,8 @@ import { ADDRESS, DEFAULTS, EXAMPLE_SITE, EXISTING, FIXED, GLASSES, GRAMS_PER_LB
 const BASE = { ...DEFAULTS, ...EXAMPLE_SITE }
 import { fakeEngine } from './fake-engine.js'
 
-const q = (o) => new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)]))
+// Empty values (u: null, the standard U) stay out of the link, as on the page.
+const q = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== null).map(([k, v]) => [k, String(v)]))
 const client = (opts, extra = {}) => {
   const f = fakeEngine(opts)
   return { f, c: createEngineClient({ baseUrl: 'http://engine.test', fetchImpl: f.fetchImpl, retryDelayMs: 1, ...extra }) }
@@ -87,7 +88,7 @@ test('cache key ignores address case', () => {
 
 test('cache key ignores parameter order', () => {
   const a = parseScenario(q(BASE))
-  const b = parseScenario(new URLSearchParams(Object.entries(BASE).reverse().map(([k, v]) => [k, String(v)])))
+  const b = parseScenario(new URLSearchParams(Object.entries(BASE).reverse().filter(([, v]) => v !== null).map(([k, v]) => [k, String(v)])))
   assert.equal(scenarioKey(a), scenarioKey(b))
 })
 
@@ -303,4 +304,55 @@ test('thermal table: the estimated double-pane U follows from the stated resista
 test('guard: U and f are never fixed', () => {
   assert.equal('u_ip' in FIXED, false, 'u_ip must not be in FIXED')
   assert.equal('f_cold' in FIXED, false, 'f_cold must not be in FIXED')
+})
+
+// ------------------------------------------------------------ typed U (v2.5)
+
+test('typed U: optional, 3 decimals at most, 0.050 to 1.200, numbers only', () => {
+  const u = (raw) => parseScenario(q({ ...BASE, ex: 'single', glass: 'vig', u: raw })).u
+  assert.equal(parseScenario(q(BASE)).u, null, 'absent = the standard U')
+  assert.equal(u(''), null, 'empty = the standard U')
+  assert.equal(u('0.2'), 0.2)
+  assert.equal(u('.25'), 0.25)
+  assert.equal(u('0.050'), 0.05)
+  assert.equal(u('1.200'), 1.2)
+  for (const bad of ['0.049', '1.201', '0.2345', 'abc', '1e-1', '-0.2', '0x1', ' 0.2', '0.2.1']) {
+    assert.throws(() => u(bad), (e) => e instanceof HttpError && e.status === 400 && /^u must/.test(e.message), bad)
+  }
+})
+
+test('typed U equal to the standard value is no override', () => {
+  for (const ex of EXISTING) {
+    for (const g of GLASSES) {
+      const std = thermalOf(ex.key, g.key).u_ip
+      assert.equal(parseScenario(q({ ...BASE, ex: ex.key, glass: g.key, u: std.toFixed(3) })).u, null, `${ex.key}/${g.key}`)
+    }
+  }
+})
+
+test('typed U reaches the engine as u_ip; f stays the standard value', () => {
+  const s = parseScenario(q({ ...BASE, ex: 'double', glass: 'double', u: '0.310' }))
+  const p = engineParams(s)
+  assert.equal(p.u_ip, 0.31)
+  assert.equal(p.f_cold, THERMAL.double.double.f_cold)
+  assert.equal(engineParams({ ...s, u: null }).u_ip, THERMAL.double.double.u_ip)
+  const th = thermalOf('double', 'double', 0.31)
+  assert.deepEqual(th, { f_cold: 0.2, u_ip: 0.31, u_estimate: false, u_entered: true, u_table: THERMAL.double.double.u_ip })
+  assert.equal(thermalOf('double', 'double').u_entered, undefined, 'the table entries stay untouched')
+})
+
+test('cache key: unchanged without a typed U, different with one', () => {
+  const a = parseScenario(q(BASE))
+  assert.equal(scenarioKey(a).includes('u='), false, 'pre-v2.5 keys (and report ids) stay the same')
+  const b = parseScenario(q({ ...BASE, u: '0.2' }))
+  assert.notEqual(scenarioKey(a), scenarioKey(b))
+  assert.match(scenarioKey(b), /&u=0\.2&/)
+})
+
+test('typed U: the engine echo check covers it', async () => {
+  const { f, c } = client()
+  const r = await c.run(parseScenario(q({ ...BASE, u: '0.421' })))
+  assert.ok(r.result)
+  const sent = f.calls.urls.find((u) => u.searchParams.has('u_ip'))
+  assert.equal(sent.searchParams.get('u_ip'), '0.421')
 })

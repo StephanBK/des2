@@ -83,7 +83,7 @@ async function start(t, opts = {}) {
   return { get, f }
 }
 
-const qs = (o = {}) => new URLSearchParams(Object.entries({ ...BASE, ...o }).map(([k, v]) => [k, String(v)])).toString()
+const qs = (o = {}) => new URLSearchParams(Object.entries({ ...BASE, ...o }).filter(([, v]) => v !== null).map(([k, v]) => [k, String(v)])).toString()
 
 test('report data: three glasses, three sweeps, headroom, site, a link that reopens the scenario', async (t) => {
   const s = await start(t)
@@ -115,6 +115,38 @@ test('report data: three glasses, three sweeps, headroom, site, a link that reop
   await s.get(`/api/report.json?${qs({ glass: 'double' })}&project=Lobby`)
   assert.equal(s.f.calls.lifetime, 3)
   assert.equal(s.f.calls.sweep, 3)
+})
+
+test('report with a typed U: the chosen glass uses it, the other two keep their standard U', async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report.json?${qs({ ex: 'double', glass: 'vig', u: '0.180' })}`)
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  const d = r.json
+  assert.equal(d.config.thermal.u_ip, 0.18)
+  assert.equal(d.config.thermal.u_entered, true)
+  assert.equal(d.config.thermal.u_estimate, false)
+  assert.equal(d.config.thermal.u_table, 0.138)
+  const byKey = Object.fromEntries(d.options.map((o) => [o.key, o.thermal]))
+  assert.equal(byKey.vig.u_ip, 0.18)
+  assert.equal(byKey.single.u_ip, 0.249)
+  assert.equal(byKey.double.u_ip, 0.193)
+  assert.equal(byKey.single.u_entered, undefined)
+  // what the engine was actually sent: 0.180 only with the VIG f, never with another glass
+  const vigF = '0.064'
+  for (const u of s.f.calls.urls) {
+    const sent = u.searchParams.get('u_ip')
+    if (sent === '0.18') assert.equal(u.searchParams.get('f_cold'), vigF, `${u.pathname}: typed U only for VIG`)
+  }
+  assert.equal(s.f.calls.urls.filter((u) => u.searchParams.get('u_ip') === '0.18').length, 2, 'the VIG run and the VIG sweep')
+  assert.equal(new URL(d.link).searchParams.get('u'), '0.18', 'the link reopens the typed U')
+})
+
+test('report PDF with a typed U still fits on 3 pages', async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report?${qs({ ex: 'double', glass: 'vig', u: '0.180' })}&project=${encodeURIComponent('Long project name '.repeat(4).trim())}`)
+  assert.equal(r.status, 200)
+  const pages = (r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length
+  assert.equal(pages, 3)
 })
 
 test('report: a sweep for the wrong input is refused, not drawn', async (t) => {

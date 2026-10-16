@@ -49,7 +49,7 @@ async function start(t, opts = {}) {
   return { app, get, f }
 }
 
-const runPath = (o = {}) => `/api/run?${new URLSearchParams(Object.entries({ ...BASE, ...o }).map(([k, v]) => [k, String(v)]))}`
+const runPath = (o = {}) => `/api/run?${new URLSearchParams(Object.entries({ ...BASE, ...o }).filter(([, v]) => v !== null).map(([k, v]) => [k, String(v)]))}`
 
 test('run, then the same run is served from cache', async (t) => {
   const s = await start(t)
