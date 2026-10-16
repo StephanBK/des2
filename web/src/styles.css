@@ -122,6 +122,43 @@ h1, h2, h3, p { margin: 0; }
 .site-facts { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--ink-3); padding-bottom: 11px; }
 .site-facts strong { color: var(--ink-2); font-weight: 600; }
 
+/* window assembly: two big toggles under the address, spanning the band */
+.assembly {
+  grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 2fr) auto minmax(0, 3fr);
+  gap: 14px; align-items: start; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--line-soft);
+}
+.asm-title { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px; }
+.asm-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
+.asm-opt {
+  display: flex; align-items: center; gap: 10px; text-align: left; padding: 9px 12px;
+  background: var(--page); border: 1.5px solid var(--line); border-radius: var(--r);
+  transition: border-color 120ms, background 120ms, box-shadow 120ms;
+}
+.asm-opt:hover { border-color: var(--ink-3); background: var(--surface); }
+.asm-opt.on { background: var(--teal-soft); border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal) inset; }
+.asm-text { display: flex; flex-direction: column; min-width: 0; }
+.asm-name { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.asm-sub { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asm-opt.on .asm-name { color: var(--teal-ink); }
+.asm-plus { align-self: center; margin-top: 18px; font-size: 22px; font-weight: 300; color: var(--ink-3); }
+.asm-note { margin-top: 6px; font-size: 12px; color: #6b4a07; }
+.pane-icon { flex: none; width: 26px; height: 36px; }
+.pane-lite { fill: var(--pane); stroke: var(--pane-edge); stroke-width: 0.8; }
+.pane-gap { fill: var(--cavity); }
+.pane-dot { fill: var(--seal); }
+.pane-frame { fill: var(--frame); }
+.asm-opt.on .pane-lite { fill: #bfe3ea; stroke: var(--teal); }
+
+/* empty start: nothing runs until there is an address */
+.empty-start {
+  display: flex; gap: 16px; align-items: flex-start; text-align: left; max-width: 680px; margin: 6px auto 0;
+  padding: 18px 22px; background: var(--surface); border: 1px dashed var(--ink-3); border-radius: 6px;
+}
+.empty-start svg { flex: none; width: 26px; height: 26px; fill: none; stroke: var(--teal); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-top: 2px; }
+.empty-title { font-size: 18px; font-weight: 600; }
+.empty-sub { font-size: 14px; color: var(--ink-2); margin-top: 2px; }
+.empty-strip { padding: 28px 0; text-align: center; color: var(--ink-3); font-size: 14px; border: 1px dashed var(--line); border-radius: 4px; background: var(--surface); }
+
 /* ------------------------------------------------------------ page */
 .page { position: relative; max-width: 1320px; margin: 0 auto; padding: 32px 40px 56px; }
 .progress { position: fixed; left: 0; right: 0; top: 0; height: 3px; overflow: hidden; z-index: 40; }
@@ -161,7 +198,7 @@ h1, h2, h3, p { margin: 0; }
 .center { min-width: 0; }
 .cavity { margin: 0; }
 .cavity svg { display: block; width: 100%; height: auto; max-width: 660px; margin: 0 auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
-.under { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 660px; margin: 6px auto 0; }
+.under { display: grid; grid-template-columns: minmax(0, 330px); justify-content: center; gap: 32px; max-width: 660px; margin: 6px auto 0; }
 
 /* svg text and result chips */
 .cavity text { font-family: var(--font); }
@@ -343,6 +380,8 @@ input[type='range']::-moz-range-thumb { width: 12px; height: 12px; border-radius
 }
 @media (max-width: 900px) {
   .sitebar-in { grid-template-columns: 1fr; padding: 12px 16px 10px; }
+  .assembly { grid-template-columns: 1fr; gap: 10px; }
+  .asm-plus { display: none; }
   .site-facts { padding-bottom: 0; }
 }
 @media (max-width: 700px) {
@@ -360,6 +399,7 @@ input[type='range']::-moz-range-thumb { width: 12px; height: 12px; border-radius
   .card { padding: 12px 16px 14px; }
   .rig { grid-template-columns: 1fr; gap: 26px; }
   .under { grid-template-columns: 1fr; gap: 22px; }
+  .asm-seg { grid-auto-flow: row; }
   .rig [data-tip]::after { display: none; }
   /* the drawing scales to ~0.6x on a phone: enlarge its labels, drop the minor ones */
   .zone { font-size: 18px; }

@@ -1,8 +1,8 @@
 # HANDOVER: cavity fog outlook (des2)
 
-Last session: 2026-10-15. State: v2.3.0 (any address, existing single or
-double pane with WINDOW f values, customer PDF report, 3 pages with a
-disclaimer). Before that:
+Last session: 2026-10-15. State: v2.4.0 (empty start, window assembly bar,
+existing single or double pane with WINDOW f values, customer PDF report,
+3 pages with a disclaimer). Before that:
 2026-09-29, v1.11.0. Repo StephanBK/des2 (Stephan's
 personal account), a copy of StephanBK/park277-desiccant with full history
 (up to v1.10.0, main ad19a79). des2 is identical to park277-desiccant in
@@ -18,6 +18,28 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.4.0 (2026-10-15 evening): empty start, window assembly bar
+
+- Stephan: no default address; desiccant default 0; an easy, prominent
+  single/double toggle for the existing window that changes the drawing;
+  the 3 retrofit glasses as a toggle, each with its own U; 6 combinations
+  (double-pane U values to follow "tomorrow", i.e. 2026-10-16).
+- DEFAULTS: addr '' (lat/lon null), lb 0. Nothing runs until an address is
+  entered: empty-state card where the results go, calendar placeholder,
+  "Customer report" disabled. EXAMPLE_SITE (350 Fifth Ave) is for tests
+  only; tests use BASE = { ...DEFAULTS, ...EXAMPLE_SITE }.
+- AssemblyBar (web/src/Controls.jsx) in the top band under the address:
+  "Existing window" (Single pane / Double pane) + "INOVUES retrofit glass"
+  (SWR / SWR-IG / SWR-VIG) as large buttons with small section icons; each
+  retrofit button shows its U for the chosen existing window, "*" and a
+  note while that U is an estimate. Old side and under-drawing pickers
+  removed. Drawing: existing double pane now has a wide air gap with edge
+  spacers and an "air" label; labels read "Existing single/double pane".
+- Live engine, Chicago 233 S Wacker, existing double, VIG, no desiccant,
+  70 F / 30 %: 104 fog days/yr (was 87 with the estimated f 0.074; WINDOW
+  f 0.064 runs the old glass a little colder).
+- Tests 84 -> 85.
 
 ## v2.3.0 (2026-10-15): WINDOW f values for an existing double pane
 

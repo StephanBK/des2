@@ -1,4 +1,4 @@
-import { EXISTING, GLASSES, glassTip, RANGES } from '../../shared/scenario.js'
+import { EXISTING, GLASSES, glassTip, RANGES, thermalOf } from '../../shared/scenario.js'
 
 // Leak bar length on a log scale: the ladders span 0.005 to 2.0 cfm/ft2,
 // a factor of 400, so a linear bar would show everything but the last rung
@@ -79,42 +79,78 @@ function Slider({ id, label, value, unit, range, onChange, ticks }) {
   )
 }
 
-export function ExistingPicker({ value, onPick }) {
+// Small section icons for the assembly bar: lites as bars, gaps as space.
+//   existing single: one lite; existing double: two lites with an air gap
+//   retrofit single / double / VIG: one lite; two with a gap; two close with pillar dots
+const ICON = {
+  'ex-single': [[9, 4]],
+  'ex-double': [[5, 3.5], [13.5, 3.5]],
+  'rt-single': [[9, 4]],
+  'rt-double': [[5, 3.5], [13.5, 3.5]],
+  'rt-vig': [[7, 3.5], [12, 3.5]],
+}
+function PaneIcon({ kind }) {
+  const lites = ICON[kind]
   return (
-    <Group title="Existing glass">
-      <div className="seg two" role="radiogroup" aria-label="Existing glass">
-        {EXISTING.map((x) => {
-          const on = value === x.key
-          return (
-            <button key={x.key} type="button" role="radio" aria-checked={on} className={on ? 'on' : ''}
-              data-tip={x.tip} onClick={() => onPick(x.key)}>
-              {x.label}
-            </button>
-          )
-        })}
-      </div>
-      {value === 'double' && (
-        <p className="est-note">Over an existing double pane, f values are from WINDOW; U values are estimates until WINDOW results replace them.</p>
-      )}
-    </Group>
+    <svg className="pane-icon" viewBox="0 0 22 30" aria-hidden="true">
+      {kind === 'ex-double' || kind === 'rt-double' ? <rect x="8.5" y="3" width="5" height="24" className="pane-gap" /> : null}
+      {lites.map(([x, w]) => <rect key={x} x={x} y="3" width={w} height="24" rx="0.8" className="pane-lite" />)}
+      {kind === 'rt-vig' && [8, 13, 18, 23].map((y) => <rect key={y} x="10.6" y={y} width="1.2" height="1.2" className="pane-dot" />)}
+      <rect x="2" y="1" width="18" height="2.2" rx="1" className="pane-frame" />
+      <rect x="2" y="26.8" width="18" height="2.2" rx="1" className="pane-frame" />
+    </svg>
   )
 }
 
-export function GlassPicker({ value, existing, onPick }) {
+/**
+ * The window assembly, prominent at the top: existing window (single or
+ * double pane) and the INOVUES retrofit glass (SWR, SWR-IG, SWR-VIG).
+ * 2 x 3 = 6 pairings, each with its own f and U (shared/scenario.js THERMAL).
+ */
+export function AssemblyBar({ ex, glass, onEx, onGlass }) {
+  const anyEstimate = GLASSES.some((g) => thermalOf(ex, g.key).u_estimate)
   return (
-    <Group title="Retrofit glass">
-      <div className="seg" role="radiogroup" aria-label="Retrofit glass">
-        {GLASSES.map((g) => {
-          const on = value === g.key
-          return (
-            <button key={g.key} type="button" role="radio" aria-checked={on} className={on ? 'on' : ''}
-              data-tip={glassTip(existing, g.key)} onClick={() => onPick(g.key)}>
-              {g.label}
-            </button>
-          )
-        })}
+    <div className="assembly" role="group" aria-label="Window assembly">
+      <div className="asm-group">
+        <h2 className="asm-title">Existing window</h2>
+        <div className="asm-seg" role="radiogroup" aria-label="Existing window">
+          {EXISTING.map((x) => {
+            const on = ex === x.key
+            return (
+              <button key={x.key} type="button" role="radio" aria-checked={on} className={`asm-opt${on ? ' on' : ''}`}
+                data-tip={x.tip} onClick={() => onEx(x.key)}>
+                <PaneIcon kind={`ex-${x.key}`} />
+                <span className="asm-text">
+                  <span className="asm-name">{x.label}</span>
+                  <span className="asm-sub">{x.key === 'single' ? 'One lite of glass' : 'Insulating glass unit'}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
-    </Group>
+      <div className="asm-plus" aria-hidden="true">+</div>
+      <div className="asm-group asm-grow">
+        <h2 className="asm-title">INOVUES retrofit glass</h2>
+        <div className="asm-seg" role="radiogroup" aria-label="INOVUES retrofit glass">
+          {GLASSES.map((g) => {
+            const on = glass === g.key
+            const t = thermalOf(ex, g.key)
+            return (
+              <button key={g.key} type="button" role="radio" aria-checked={on} className={`asm-opt${on ? ' on' : ''}`}
+                data-tip={glassTip(ex, g.key)} onClick={() => onGlass(g.key)}>
+                <PaneIcon kind={`rt-${g.key}`} />
+                <span className="asm-text">
+                  <span className="asm-name">{g.product}</span>
+                  <span className="asm-sub">{g.label} · U {t.u_ip.toFixed(3)}{t.u_estimate ? '*' : ''}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        {anyEstimate && <p className="asm-note">* U over an existing double pane is an estimate until WINDOW results replace it.</p>}
+      </div>
+    </div>
   )
 }
 

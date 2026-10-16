@@ -9,7 +9,10 @@ import { request } from 'node:http'
 import { createApp } from '../server/index.js'
 import { createEngineClient } from '../server/engine.js'
 import { createSuggester } from '../server/suggest.js'
-import { DEFAULTS } from '../shared/scenario.js'
+import { DEFAULTS, EXAMPLE_SITE } from '../shared/scenario.js'
+
+// The page's defaults have no address (v2.4); tests add a known one.
+const BASE = { ...DEFAULTS, ...EXAMPLE_SITE }
 import { fakeEngine } from './fake-engine.js'
 
 let dist
@@ -46,7 +49,7 @@ async function start(t, opts = {}) {
   return { app, get, f }
 }
 
-const runPath = (o = {}) => `/api/run?${new URLSearchParams(Object.entries({ ...DEFAULTS, ...o }).map(([k, v]) => [k, String(v)]))}`
+const runPath = (o = {}) => `/api/run?${new URLSearchParams(Object.entries({ ...BASE, ...o }).map(([k, v]) => [k, String(v)]))}`
 
 test('run, then the same run is served from cache', async (t) => {
   const s = await start(t)

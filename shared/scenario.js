@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '2.3.0'
+export const APP_VERSION = '2.4.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
@@ -97,13 +97,15 @@ export const RANGES = {
 // The address is free text (v2.0): any building the engine's geocoder and
 // the NREL weather set can reach (the Americas). lat/lon are where the
 // address box's suggestion put it; when present, the engine's own geocode
-// must land within SITE_TOL_DEG of it. The default is only a first-load
-// example.
+// must land within SITE_TOL_DEG of it.
+// v2.4 (Stephan 2026-10-15): the page starts with an EMPTY address box and
+// runs nothing until an address is entered; desiccant starts at 0 lb.
 export const ADDRESS = { min: 5, max: 200 }
 export const SITE_TOL_DEG = 0.02            // about 2 km, the size of one weather cell
-export const DEFAULT_SITE = { addr: '350 Fifth Avenue, New York, New York 10118, United States', lat: 40.74844, lon: -73.98566 }
+// A known address for tests and examples only; never pre-filled on the page.
+export const EXAMPLE_SITE = { addr: '350 Fifth Avenue, New York, New York 10118, United States', lat: 40.74844, lon: -73.98566 }
 
-export const DEFAULTS = { ex: 'single', glass: 'vig', seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 8, t: 70, rh: 30, ...DEFAULT_SITE }
+export const DEFAULTS = { ex: 'single', glass: 'vig', seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, addr: '', lat: null, lon: null }
 
 // Every hidden engine input is pinned explicitly (not left to engine
 // defaults), so an engine default change cannot move these results, and

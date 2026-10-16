@@ -13,8 +13,9 @@ export class ApiError extends Error {
 }
 
 // lat/lon are left out when the address was typed rather than picked.
+// An empty address (nothing entered yet) is left out too.
 export function queryOf(s) {
-  return new URLSearchParams(ORDER.filter((k) => s[k] !== null && s[k] !== undefined).map((k) => [k, String(s[k])])).toString()
+  return new URLSearchParams(ORDER.filter((k) => s[k] !== null && s[k] !== undefined && s[k] !== '').map((k) => [k, String(s[k])])).toString()
 }
 
 // Recent results, so flipping back to a scenario is instant. Results never
@@ -78,7 +79,7 @@ function coord(raw, limit) {
   return Math.abs(v) <= limit ? Math.round(v * 1e5) / 1e5 : null
 }
 
-/** Address (and where it was picked) from the address bar; the default site when absent. */
+/** Address (and where it was picked) from the address bar; empty when absent or invalid. */
 function urlSite(p) {
   const addr = (p.get('addr') || '').replace(/\s+/g, ' ').trim()
   if (addr.length < ADDRESS.min || addr.length > ADDRESS.max) return { addr: DEFAULTS.addr, lat: DEFAULTS.lat, lon: DEFAULTS.lon }

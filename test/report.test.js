@@ -10,7 +10,10 @@ import { createEngineClient } from '../server/engine.js'
 import { createSuggester } from '../server/suggest.js'
 import { cleanProject, headroomOf, monthlyFogDays, reportId, RH_LEVELS } from '../server/report-data.js'
 import { DISCLAIMER } from '../server/report-pdf.js'
-import { DEFAULTS } from '../shared/scenario.js'
+import { DEFAULTS, EXAMPLE_SITE } from '../shared/scenario.js'
+
+// The page's defaults have no address (v2.4); tests add a known one.
+const BASE = { ...DEFAULTS, ...EXAMPLE_SITE }
 import { fakeEngine } from './fake-engine.js'
 
 // ------------------------------------------------------------ pure parts
@@ -80,7 +83,7 @@ async function start(t, opts = {}) {
   return { get, f }
 }
 
-const qs = (o = {}) => new URLSearchParams(Object.entries({ ...DEFAULTS, ...o }).map(([k, v]) => [k, String(v)])).toString()
+const qs = (o = {}) => new URLSearchParams(Object.entries({ ...BASE, ...o }).map(([k, v]) => [k, String(v)])).toString()
 
 test('report data: three glasses, three sweeps, headroom, site, a link that reopens the scenario', async (t) => {
   const s = await start(t)
@@ -93,13 +96,13 @@ test('report data: three glasses, three sweeps, headroom, site, a link that reop
   assert.equal(d.options[1].thermal.u_ip, 0.249)
   assert.equal(d.config.glass.product, 'SWR-IG')
   assert.equal(d.config.seal_out.cfm_ft2, 0.005)
-  assert.equal(d.site.matched, DEFAULTS.addr)
+  assert.equal(d.site.matched, BASE.addr)
   assert.deepEqual(d.year.monthly_fog_days.length, 12)
   assert.ok(!d.config.assumptions.some((a) => /hover/.test(a)), 'no screen-only wording on paper')
   const link = new URL(d.link)
   assert.equal(link.host, 'des2.example')
   assert.equal(link.searchParams.get('glass'), 'double')
-  assert.equal(link.searchParams.get('addr'), DEFAULTS.addr)
+  assert.equal(link.searchParams.get('addr'), BASE.addr)
   assert.equal(link.searchParams.get('project'), null)
   assert.equal(s.f.calls.lifetime, 3)
   assert.equal(s.f.calls.sweep, 3)

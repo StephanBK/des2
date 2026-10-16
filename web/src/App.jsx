@@ -6,7 +6,7 @@ import ReportDialog from './ReportDialog.jsx'
 import { fetchConfig, peek, queryOf, readUrlHours, readUrlScenario, runScenario, writeUrlScenario } from './api.js'
 import Assumptions from './Assumptions.jsx'
 import Cavity from './Cavity.jsx'
-import { DesiccantSlider, dewPointF, ExistingPicker, GlassPicker, RoomSliders, SealLadder } from './Controls.jsx'
+import { AssemblyBar, DesiccantSlider, dewPointF, RoomSliders, SealLadder } from './Controls.jsx'
 import FogCalendar, { Legend } from './FogCalendar.jsx'
 
 function ErrorPanel({ error, onRetry }) {
@@ -30,6 +30,7 @@ function ErrorPanel({ error, onRetry }) {
 // from what was typed, and the weather data behind the numbers.
 function SiteFacts({ data, scenario, busy }) {
   const e = data?.engine
+  if (!scenario.addr) return <p className="site-facts"><span>Enter the building's address to load its weather and run the simulation.</span></p>
   // Facts belong to the result on screen; a new address shows nothing old.
   const current = data?.scenario?.addr === scenario.addr
   if (busy && !current) return <p className="site-facts"><span>Finding the address and its weather…</span></p>
@@ -50,7 +51,7 @@ export default function App() {
   const [scenario, setScenario] = useState(readUrlScenario)
   const [config, setConfig] = useState(null)
   const [data, setData] = useState(() => peek(scenario) ?? null)
-  const [busy, setBusy] = useState(true)
+  const [busy, setBusy] = useState(() => Boolean(scenario.addr))
   const [error, setError] = useState(null)
   const [drawer, setDrawer] = useState(false)
   const [report, setReport] = useState(false)
@@ -63,6 +64,8 @@ export default function App() {
   useEffect(() => { fetchConfig().then(setConfig).catch(() => setConfig(null)) }, [])
 
   useEffect(() => {
+    // Nothing to simulate until there is an address.
+    if (!scenario.addr) { setData(null); setBusy(false); setError(null); return undefined }
     const hit = peek(scenario)
     if (hit) { setData(hit); setBusy(false); setError(null); return undefined }
     const ctl = new AbortController()
@@ -119,6 +122,8 @@ export default function App() {
           <AddressBox value={scenario.addr} suggestOn={config ? config.suggest : undefined}
             onPick={(site) => update(site)} />
           <SiteFacts data={error ? null : data} scenario={scenario} busy={busy} />
+          <AssemblyBar ex={scenario.ex} glass={scenario.glass}
+            onEx={(k) => update({ ex: k })} onGlass={(k) => update({ glass: k })} />
         </div>
       </section>
 
@@ -127,7 +132,16 @@ export default function App() {
 
         <section className={`answer-block${dim}`}>
           {error && <ErrorPanel error={error} onRetry={() => setAttempt((a) => a + 1)} />}
-          {!error && !r && <div className="sk-line wide" aria-hidden="true" />}
+          {!scenario.addr && (
+            <div className="empty-start">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" /></svg>
+              <div>
+                <p className="empty-title">Start with the building's address</p>
+                <p className="empty-sub">Type it in the box above and pick a suggestion. The weather for that site loads and the simulation runs. Set the window assembly first or after; every change re-runs.</p>
+              </div>
+            </div>
+          )}
+          {scenario.addr && !error && !r && <div className="sk-line wide" aria-hidden="true" />}
           {r && (
             <>
               <p className="sr-only" aria-live="polite">{sentences.join(' ')}</p>
@@ -147,7 +161,6 @@ export default function App() {
 
         <section className="rig" aria-label="Scenario">
           <div className="side outside-side">
-            <ExistingPicker value={scenario.ex} onPick={(k) => update({ ex: k })} />
             <SealLadder title="Existing window seal" items={SEALS_EXISTING} value={scenario.seal_out}
               engineValues={config?.seals_existing} onPick={(k) => update({ seal_out: k })} />
           </div>
@@ -157,7 +170,6 @@ export default function App() {
               place={placeName(data?.engine?.site || scenario.addr)}
               dewF={dewPointF(scenario.t, scenario.rh)} />
             <div className="under">
-              <GlassPicker value={scenario.glass} existing={scenario.ex} onPick={(k) => update({ glass: k })} />
               <DesiccantSlider value={scenario.lb} onChange={(v) => update({ lb: v }, 'slider')} />
             </div>
           </div>
@@ -192,7 +204,7 @@ export default function App() {
               <FogCalendar result={r} runKey={queryOf(data.scenario)} working={hours === 'working'} />
               <Legend working={hours === 'working'} />
             </>
-          ) : !error && <div className="sk-strip" aria-hidden="true" />}
+          ) : !error && (scenario.addr ? <div className="sk-strip" aria-hidden="true" /> : <p className="empty-strip">The hour-by-hour fog calendar appears here once an address is entered.</p>)}
         </section>
       </main>
 
