@@ -1,6 +1,8 @@
-# HANDOVER: cavity fog outlook (des2)
+# HANDOVER: SWR Condensation Assessment (des2, formerly "Cavity fog outlook")
 
-Last session: 2026-10-16. State: v2.6.0 (cavity depth / offset as an input,
+Last session: 2026-10-17. State: v2.7.0 (Anas's review: names, facade and
+window size inputs, customer report cleanup). Before that: 2026-10-16, v2.6.0
+(cavity depth / offset as an input,
 assembly U as a typed input, plus everything below: empty start, window assembly bar, existing single or
 double pane with WINDOW f values, customer PDF report, 3 pages with a
 disclaimer). Before that: 2026-10-15, v2.4.1. Before that:
@@ -19,6 +21,60 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.7.0 (2026-10-17): Anas's review (Falchi and Erieview runs)
+
+Anas reviewed the app in Slack (DM to Stephan, 2026-10-17, 8 screenshots
+with highlights and red crosses). Stephan's decisions on the open points:
+desiccant option 1b (one app, report silent about desiccant at 0 lb);
+remove leftover asterisks and ENTERED tags too; remove "clear up to" for now;
+reword the portal tile.
+
+- Name: SWR Condensation Assessment (page title, header, report cover,
+  footer, PDF properties, file name INOVUES-SWR-condensation-assessment-...).
+  Apps portal tile renamed and reworded (StephanBK/apps-portal; slug
+  "desiccant" kept so bookmarks still work).
+- Retrofit seal labels (keys unchanged, so links and engine presets match):
+  Wet-sealed; gasketed = Dry-seal, max compression; certified_best =
+  Dry-seal, tight; certified_typical = Dry-seal, good; vented = Vented. The
+  seal tooltips now use the app label, not the engine's old name.
+- Inputs back (fixed since v2.0): facade orientation (URL facade=
+  north|east|south|west) and window width / height (URL width=, height=,
+  whole inches 12 to 240; the engine allows 1 to 400). At north and 60 x 96
+  they stay out of links, cache keys and report ids (atDefault in
+  server/engine.js), so every pre-v2.7 link and report id is unchanged
+  (tested against the literal v2.6 key). Page: "Window size" and "Facade"
+  under the drawing, same box behaviour as cavity depth.
+- FINDING (live engine, 31-00 47th Ave, Long Island City = Falchi; existing
+  double, VIG, aged / dry-seal tight, 0 lb, 70 F / 30 %): fog days a year
+  north 38, east 50, south 38, west 6; window 30 x 48 / 60 x 96 / 120 x 120:
+  39 / 38 / 34. North is NOT always the worst facade (wind direction), so
+  the old "north = cautious case" wording was removed everywhere.
+- Customer report, 0 lb of desiccant: no desiccant anywhere (no desiccant
+  card, row, chart, table column, sentence). story.js summarize /
+  headlineCards take { quiet: true } for this; the page does not pass it, so
+  the page still says "Without desiccant" and shows the desiccant box.
+  Checked on the rendered PDF: "desiccant" 16 times before, 0 after. With
+  desiccant the report is as before.
+- Removed from the report: page-1 ENTERED tag and teal note, options-table
+  ENTERED tag and U asterisk, the options footnote block (incl. "why a
+  better-insulating retrofit can fog more"), the humidity headroom chart,
+  every "clear up to X %" line (page 1 glass cards, options table column).
+  Page 3 is now "Options and site climate". Page-2 bullet that pointed to
+  the headroom chart reworded.
+- Humidity sweeps no longer run for a report: 3 engine runs instead of 6
+  (live Falchi report 2.4 s vs 9.3 s). headroomOf, RH_LEVELS, sweepCached
+  and engine.sweepRh are kept and tested, so the headroom can come back.
+- New "How this assessment works" note (methodItems in report-pdf.js) before
+  the disclaimer: weather, glass temperature, moisture, fog, run length.
+  Silent about desiccant at 0 lb.
+- Live check: Falchi with Anas's inputs (existing double, SWR-IG, U 0.196,
+  aged / tight, 0 lb, 70 F / 30 %) gives the same numbers in the old and new
+  code (2 fog days a year, first fog Dec 24 year 1; options 0 / 2 / 38) and
+  the same report id.
+- Still on the report (not asked to remove): the page-1 ESTIMATE tag and
+  amber note for an existing double pane when U is not typed in.
+- Tests 103 -> 115.
 
 ## v2.6.0 (2026-10-16): cavity depth (offset) as an input
 
@@ -470,6 +526,13 @@ run" with the detail "engine returned no fog map": by design, not a crash.
   `.lane-bottom` (a shared `.top` once inflated the lanes).
 
 ## Open items
+
+- Ask Anas: should the page-1 ESTIMATE tag and note (existing double pane,
+  U not typed) go too, by the same logic as the ENTERED note?
+- "Clear up to X %" / humidity headroom: off for now (v2.7). Anas thought
+  the values looked inconsistent (SWR-IG 2 fog days at 30 % but "clear up
+  to 25 %"). They were consistent by definition (highest RH in 5 % steps with
+  zero fog days), but read as a contradiction; reword before bringing back.
 
 - WINDOW runs per cavity depth (f, U, air-gap R by offset), so the offset
   input (v2.6.0) changes glass temperatures, not just cavity volume.

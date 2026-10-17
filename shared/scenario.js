@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '2.6.0'
+export const APP_VERSION = '2.7.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
@@ -79,7 +79,11 @@ export function thermalOf(existing, glass, u = null) {
 export const OFFSET_INPUT = { min: 0.25, max: 4, decimals: 2, default: 0.6 }
 
 // v2.7 (Anas 2026-10-17): facade orientation and window width and height are
-// inputs again (fixed since v2.0). The engine accepts these four orientations
+// inputs again (fixed since v2.0). North is the default but NOT always the
+// worst case: the facade also sets the wind pressure, so at 31-00 47th Ave,
+// Long Island City (existing double, VIG, aged / tight dry seal, 0 lb,
+// 70 F / 30 %) the live engine gave north 38, east 50, south 38, west 6 fog
+// days a year; window 30 x 48 / 60 x 96 / 120 x 120 gave 39 / 38 / 34. The engine accepts these four orientations
 // and 1 to 400 in for each side; the page allows 12 to 240 in, whole inches.
 // At their defaults (north, 60 x 96 in) they stay out of links, cache keys and
 // report ids, so everything from before v2.7 keeps working unchanged.
@@ -172,7 +176,7 @@ export const WORKING_HOURS = { start: 8, end: 18, days: 261, hours: 2610, label:
 
 // Plain-language list of what is fixed, for the assumptions drawer.
 export const FIXED_DESCRIPTION = [
-  ['Building', 'Window at mid-height of a 20-story building, where the stack effect is close to zero. The facade orientation is an input, north unless changed (no direct sun warms the glass, the cautious case); it sets how much sun reaches the glass and which winds press on the facade.'],
+  ['Building', 'Window at mid-height of a 20-story building, where the stack effect is close to zero. The facade orientation is an input, north unless changed. It sets how much sun reaches the glass and which winds press on the facade; because of the wind, north is not always the facade that fogs most (live check, Long Island City, VIG: north 38, east 50, south 38, west 6 fog days a year).'],
   ['Window', 'Width and height are inputs, 60 × 96 in unless changed. The cavity depth between the existing glass and the retrofit is an input too, 0.6 in unless changed.'],
   ['Weather', 'Typical meteorological year for the site (NREL NSRDB), repeated every year.'],
   ['Start', 'Installation on January 1 with a fresh desiccant.'],

@@ -427,7 +427,7 @@ input[type='range']::-moz-range-thumb { width: 12px; height: 12px; border-radius
 @media (max-width: 700px) {
   .masthead { grid-template-columns: auto 1fr auto; padding: 12px 16px; gap: 12px; }
   .title { text-align: left; }
-  .title h1 { font-size: 19px; }
+  .title h1 { font-size: 16.5px; font-stretch: 104%; }  /* the longer name (v2.7) fits on two lines */
   .title p, .brand .word { display: none; }
   .head-actions { gap: 6px; }
   .head-actions .ghost { padding: 8px 10px; font-size: 14px; }

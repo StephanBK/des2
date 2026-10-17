@@ -1,6 +1,6 @@
 {
   "name": "des2",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "private": true,
   "description": "SWR Condensation Assessment (formerly Cavity fog outlook) for any building address: secondary window retrofit fog and desiccant life (INOVUES)",
   "type": "module",

@@ -274,7 +274,7 @@ export function FacadeSwitch({ value, onChange }) {
       </div>
       <p className="num-help">
         {picked.key === 'north'
-          ? 'North: no direct sun on the glass, the cautious case.'
+          ? 'North: little direct sun on the glass. Wind matters too, so another facade can fog more.'
           : `${picked.label}-facing: sets the sun on the glass and the winds on the facade.`}
       </p>
     </Group>
