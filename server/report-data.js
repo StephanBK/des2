@@ -4,8 +4,10 @@
 // Runs behind one report (each cached like a normal page run):
 //   1. the scenario on screen
 //   2. the same scenario with each other retrofit glass (options table)
-//   3. per retrofit glass, a room-humidity sweep without desiccant
-//      (headroom: up to which room RH the pane stays clear long term)
+// The room-humidity sweeps behind "humidity headroom" / "clear up to X %"
+// were switched off 2026-10-17 (Anas: remove for now). headroomOf, RH_LEVELS,
+// the server's sweepCached and the engine client's sweepRh are kept, so
+// bringing the headroom back is a small change.
 
 import {
   APP_VERSION, ASSUMPTIONS, EXISTING, FACADES, FIXED_DESCRIPTION, GLASSES, GRAMS_PER_LB, OFFSET_INPUT, SEALS_EXISTING, SEALS_RETROFIT,
@@ -93,20 +95,18 @@ function summaryOf(r) {
 }
 
 /**
- * deps: { runCached(scenario), sweepCached(scenario, levels), presets(), key, appUrl, now }
+ * deps: { runCached(scenario), presets(), key, appUrl, now }
+ * (sweepCached may still be passed; it is not used while the headroom is off.)
  */
-export async function buildReportData(scenario, { project = '', runCached, sweepCached, presets, key, appUrl, now = new Date() }) {
+export async function buildReportData(scenario, { project = '', runCached, presets, key, appUrl, now = new Date() }) {
   const others = GLASSES.filter((g) => g.key !== scenario.glass)
   // A typed U belongs to the chosen glass only; the other two use their table U.
   const asGlass = (gk) => (gk === scenario.glass ? scenario : { ...scenario, glass: gk, u: null })
-  const [main, p, ...rest] = await Promise.all([
+  const [main, p, ...otherRuns] = await Promise.all([
     runCached(scenario),
     presets().catch(() => null),
     ...others.map((g) => runCached(asGlass(g.key))),
-    ...GLASSES.map((g) => sweepCached(asGlass(g.key), RH_LEVELS)),
   ])
-  const otherRuns = rest.slice(0, others.length)
-  const sweeps = rest.slice(others.length)
   const runFor = (gk) => (gk === scenario.glass ? main : otherRuns[others.findIndex((g) => g.key === gk)])
 
   const r = main.result
@@ -154,10 +154,11 @@ export async function buildReportData(scenario, { project = '', runCached, sweep
       assumptions: ASSUMPTIONS.map((a) => a.replace(' (hover a glass button to see them)', ' (page 3 lists them)')),
     },
     result: r,
+    // quiet: with no desiccant the report never mentions desiccant (Anas 2026-10-17)
     headline: {
-      sentences: summarize(r),
-      cards: headlineCards(r),
-      working_cards: headlineCards(r, { working: true }),
+      sentences: summarize(r, { quiet: true }),
+      cards: headlineCards(r, { quiet: true }),
+      working_cards: headlineCards(r, { working: true, quiet: true }),
     },
     year: {
       index: r.years.length - 1,
@@ -167,7 +168,7 @@ export async function buildReportData(scenario, { project = '', runCached, sweep
       monthly_fog_days: monthlyFogDays(lastYear?.fog),
       working_hours: WORKING_HOURS,
     },
-    options: GLASSES.map((g, i) => {
+    options: GLASSES.map((g) => {
       const run = runFor(g.key)
       return {
         key: g.key,
@@ -176,11 +177,8 @@ export async function buildReportData(scenario, { project = '', runCached, sweep
         selected: g.key === scenario.glass,
         thermal: g.key === scenario.glass ? th : thermalOf(scenario.ex, g.key),
         ...summaryOf(run.result),
-        sweep: sweeps[i],
-        headroom: headroomOf(sweeps[i]),
       }
     }),
-    rh_levels: RH_LEVELS,
     month_names: MONTH_SHORT,
     hours_per_year: HOURS_PER_YEAR,
   }

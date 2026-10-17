@@ -4,9 +4,12 @@
 // Plain JavaScript (no JSX build step on the server): h() is
 // React.createElement. Three Letter pages (a 4th, method and limits, was
 // removed at Stephan's request 2026-10-15):
-//   1. summary      site, outlook, three key numbers, configuration
+//   1. summary      site, outlook, key numbers, configuration
 //   2. calendar     when the pane fogs, by hour and by month; desiccant
-//   3. options      the three retrofit glasses, humidity headroom, climate
+//   3. options      the three retrofit glasses, site climate, how it works
+// Anas 2026-10-17: with 0 lb of desiccant the report never mentions
+// desiccant; the ENTERED note and tags, the U asterisk, the options footnotes,
+// the humidity headroom chart and every "clear up to X %" line are gone.
 //
 // The font has no arrows or comparison signs: text uses words for those.
 
@@ -14,7 +17,7 @@ import { createElement as h } from 'react'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import {
-  Circle, Document, Font, Image, Line, Page, Path, Rect, renderToBuffer, StyleSheet, Svg, Text, View,
+  Document, Font, Image, Line, Page, Path, Rect, renderToBuffer, StyleSheet, Svg, Text, View,
 } from '@react-pdf/renderer'
 import {
   formatDate, formatDays, formatDuration, HOURS_PER_YEAR, MONTH_SHORT, MONTH_START_DAY, remainingOnDay,
@@ -192,11 +195,6 @@ function firstFogText(o) {
   if (o.first_fog_hour === null) return 'None'
   return formatDate(o.first_fog_hour, true)
 }
-function headroomText(o) {
-  if (o.headroom.all_clear) return 'Clear at every level tested (to 60 %)'
-  if (o.headroom.clear_up_to === null) return 'Fogs even at 20 %'
-  return `Clear up to ${o.headroom.clear_up_to} %`
-}
 
 // ------------------------------------------------------------ page 1: summary
 
@@ -207,7 +205,6 @@ function SummaryPage({ data }) {
   const tone = v.clear ? { bg: C.tealSoft, bd: C.teal, ink: C.tealInk } : { bg: C.fogSoft, bd: C.fog, ink: C.fogInk }
   const verdict = v.text
   const est = cfg.thermal.u_estimate
-  const entered = cfg.thermal.u_entered
   const seal = (x) => `${x.label}${x.cfm_ft2 !== null ? `, ${x.cfm_ft2} cfm/ft² at 75 Pa` : ''}`
 
   return h(Page, { size: 'LETTER', style: s.page },
@@ -217,7 +214,7 @@ function SummaryPage({ data }) {
     rest ? h(Text, { style: s.h1sub }, rest) : null,
     h(Text, { style: { fontSize: 9.5, color: C.ink2, marginTop: 8 } },
       // \u00a0 (no-break space) keeps each number on the same line as its unit.
-      `Secondary window retrofit: existing ${inSentence(cfg.existing.label)} with an INOVUES ${cfg.glass.product} (${inSentence(cfg.glass.label)}) retrofit, ${cfg.lb ? `${cfg.lb}\u00a0lb of desiccant` : 'no desiccant'}, room at ${cfg.t}\u00a0°F and ${cfg.rh}\u00a0% RH.`),
+      `Secondary window retrofit: existing ${inSentence(cfg.existing.label)} with an INOVUES ${cfg.glass.product} (${inSentence(cfg.glass.label)}) retrofit, ${cfg.lb ? `${cfg.lb}\u00a0lb of desiccant, ` : ''}room at ${cfg.t}\u00a0°F and ${cfg.rh}\u00a0% RH.`),
 
     h(View, { style: { marginTop: 13, backgroundColor: tone.bg, borderLeftWidth: 4, borderLeftColor: tone.bd, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 2 } },
       h(Text, { style: { fontSize: 7.5, fontWeight: 600, letterSpacing: 1.2, color: tone.ink } }, 'OUTLOOK FOR A TYPICAL YEAR'),
@@ -241,21 +238,17 @@ function SummaryPage({ data }) {
         h(KV, { k: 'Existing glass', v: cfg.existing.label }),
         h(KV, { k: 'Retrofit glass', v: `${cfg.glass.product} (${cfg.glass.label})` }),
         // U last, so the ESTIMATE tag sits right after the value it qualifies.
-        h(KV, { k: 'Thermal values', v: `f ${cfg.thermal.f_cold.toFixed(3)}, U ${cfg.thermal.u_ip.toFixed(3)} Btu/hr·ft²·°F`, extra: est ? h(Tag, { text: 'ESTIMATE' }) : entered ? h(Tag, { text: 'ENTERED', tone: 'teal' }) : null }),
+        h(KV, { k: 'Thermal values', v: `f ${cfg.thermal.f_cold.toFixed(3)}, U ${cfg.thermal.u_ip.toFixed(3)} Btu/hr·ft²·°F`, extra: est ? h(Tag, { text: 'ESTIMATE' }) : null }),
         h(KV, { k: 'Cavity', v: cfg.offset.changed ? `${fmtIn(cfg.offset.inches)} in; f and U as for ${fmtIn(cfg.offset.standard)} in` : `${fmtIn(cfg.offset.inches)} in between existing glass and retrofit` }),
         h(KV, { k: 'Existing seal', v: seal(cfg.seal_out) }),
         h(KV, { k: 'Retrofit seal', v: seal(cfg.seal_in) }),
-        h(KV, { k: 'Desiccant', v: cfg.lb ? `${cfg.lb} lb (${cfg.grams.toLocaleString('en-US')} g) 3A molecular sieve` : 'None' }),
+        cfg.lb ? h(KV, { k: 'Desiccant', v: `${cfg.lb} lb (${cfg.grams.toLocaleString('en-US')} g) 3A molecular sieve` }) : null,
         h(KV, { k: 'Room air', v: `${cfg.t} °F, ${cfg.rh} % RH, dew point ${fmt0(cfg.dew_f)} °F` }))),
 
     h(Glance, { data }),
     est ? h(View, { style: { marginTop: 9, backgroundColor: C.amberSoft, borderLeftWidth: 3, borderLeftColor: C.amber, paddingVertical: 4, paddingHorizontal: 8 } },
       h(Text, { style: { fontSize: 7.6, color: C.amberInk } },
         'ESTIMATE: the assembly U-value for an existing double pane is a heat-flow model estimate until a WINDOW result replaces it.'))
-      : null,
-    entered ? h(View, { style: { marginTop: 9, backgroundColor: C.tealSoft, borderLeftWidth: 3, borderLeftColor: C.teal, paddingVertical: 4, paddingHorizontal: 8 } },
-      h(Text, { style: { fontSize: 7.6, color: C.tealInk } },
-        `ENTERED: assembly U ${cfg.thermal.u_ip.toFixed(3)} typed in for this report, in place of the standard ${cfg.thermal.u_table.toFixed(3)}; glass factor f is standard.`))
       : null,
     h(Footer, { data }))
 }
@@ -273,8 +266,7 @@ function Glance({ data }) {
           h(Text, { style: { fontSize: 9, fontWeight: 600 } }, o.product),
           h(Text, { style: { fontSize: 7.5, color: C.ink3, marginLeft: 4 } }, o.selected ? 'this report' : o.label)),
         h(Text, { style: { fontSize: 13, fontWeight: 600, marginTop: 3, color: o.fog_days_per_year ? C.fogInk : C.tealInk } },
-          `${o.fog_days_per_year} fog ${o.fog_days_per_year === 1 ? 'day' : 'days'} a year`),
-        h(Text, { style: { fontSize: 7.6, color: C.ink2, marginTop: 1 } }, `${headroomText(o)} room RH, long term`)))))
+          `${o.fog_days_per_year} fog ${o.fog_days_per_year === 1 ? 'day' : 'days'} a year`)))))
 }
 
 // ------------------------------------------------------------ page 2: calendar
@@ -422,20 +414,22 @@ function CalendarPage({ data }) {
         ],
       })),
 
-    h(View, { style: { flexDirection: 'row', gap: 20, marginTop: 18 } },
-      h(View, { style: { flex: 1 } },
+    // With desiccant: fog by month and desiccant loading side by side. Without
+    // (Anas 2026-10-17): fog by month alone, full width, no desiccant panel.
+    lb > 0
+      ? h(View, { style: { flexDirection: 'row', gap: 20, marginTop: 18 } },
+        h(View, { style: { flex: 1 } },
+          h(Text, { style: s.h3 }, 'Fog days by month'),
+          h(MonthBars, { values: data.year.monthly_fog_days, width: (CW - 20) / 2, height: 120 }),
+          h(Text, { style: { ...s.small, marginTop: 4 } }, 'Days with at least one hour of visible fog, same year as above.')),
+        h(View, { style: { flex: 1 } },
+          h(Text, { style: s.h3 }, 'Desiccant loading'),
+          h(LoadingChart, { data, width: (CW - 20) / 2, height: 120 }),
+          h(Text, { style: { ...s.small, marginTop: 4 } }, 'Share of the desiccant\'s capacity used, day by day since installation. It counts as full at 95 %.')))
+      : h(View, { style: { marginTop: 18 } },
         h(Text, { style: s.h3 }, 'Fog days by month'),
-        h(MonthBars, { values: data.year.monthly_fog_days, width: (CW - 20) / 2, height: 120 }),
+        h(MonthBars, { values: data.year.monthly_fog_days, width: CW, height: 120 }),
         h(Text, { style: { ...s.small, marginTop: 4 } }, 'Days with at least one hour of visible fog, same year as above.')),
-      h(View, { style: { flex: 1 } },
-        h(Text, { style: s.h3 }, 'Desiccant loading'),
-        lb > 0
-          ? h(LoadingChart, { data, width: (CW - 20) / 2, height: 120 })
-          : h(View, { style: { height: 120, borderWidth: 0.6, borderColor: C.line, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', borderRadius: 2 } },
-            h(Text, { style: { fontSize: 8.5, color: C.ink3 } }, 'No desiccant in this scenario')),
-        h(Text, { style: { ...s.small, marginTop: 4 } }, lb > 0
-          ? 'Share of the desiccant\'s capacity used, day by day since installation. It counts as full at 95 %.'
-          : 'The cavity relies on its seals and the room air alone.'))),
 
     h(View, { style: { marginTop: 18, borderTopWidth: 0.6, borderTopColor: C.line, paddingTop: 10 } },
       h(Text, { style: s.h3 }, 'Reading the results'),
@@ -444,8 +438,8 @@ function CalendarPage({ data }) {
           fogPattern(st, ws),
           lb > 0
             ? 'While the desiccant works, it keeps the cavity air dry. Once it is full, the cavity follows the outdoor and room air that leaks in through the seals, and the yearly pattern above repeats.'
-            : 'Without desiccant, the cavity follows the outdoor and room air that leaks in through the seals. Year 1 starts from a clean pane and dry air, so the settled year 2 is reported.',
-          'Room humidity matters most: page 3 shows how fog changes with room RH for each retrofit glass.',
+            : 'The cavity air follows the outdoor and room air that leaks in through the seals. Year 1 starts from a clean pane and dry cavity air, so the settled year 2 is reported.',
+          'Room humidity matters most: more moisture in the room air raises the dew point of the air that reaches the cavity, so fog days rise quickly with room RH.',
         ],
       })),
     h(Footer, { data }))
@@ -453,100 +447,75 @@ function CalendarPage({ data }) {
 
 // ------------------------------------------------------------ page 3: options
 
-function HeadroomChart({ data, width, height }) {
-  const left = 30
-  const bottom = 20
-  const top = 8
-  const right = 6
-  const levels = data.rh_levels
-  const maxDays = Math.max(10, ...data.options.flatMap((o) => o.sweep.map((p) => p.fog_days)))
-  const nice = maxDays <= 30 ? Math.ceil(maxDays / 5) * 5 : maxDays <= 120 ? Math.ceil(maxDays / 20) * 20 : Math.ceil(maxDays / 50) * 50
-  const xOf = (rh) => left + ((rh - levels[0]) / (levels[levels.length - 1] - levels[0])) * (width - left - right)
-  const yOf = (d) => top + (1 - d / nice) * (height - top - bottom)
-  const els = []
-  const ticks = nice <= 30 ? [0, nice / 2, nice] : [0, nice / 4, nice / 2, (3 * nice) / 4, nice]
-  for (const t of ticks) {
-    els.push(h(Line, { key: `g${t}`, x1: left, y1: yOf(t), x2: width - right, y2: yOf(t), stroke: t === 0 ? C.line : C.lineSoft, strokeWidth: 0.6 }))
-    els.push(h(Text, { key: `gt${t}`, x: left - 4, y: yOf(t) + 2.3, style: { fontSize: 6.8 }, fill: C.ink3, textAnchor: 'end' }, String(Math.round(t))))
-  }
-  for (const rh of levels) {
-    els.push(h(Text, { key: `x${rh}`, x: xOf(rh), y: height - 8, style: { fontSize: 6.8 }, fill: C.ink2, textAnchor: 'middle' }, `${rh}%`))
-  }
-  const chosen = data.config.rh
-  if (chosen >= levels[0] && chosen <= levels[levels.length - 1]) {
-    els.push(h(Line, { key: 'chosen', x1: xOf(chosen), y1: top, x2: xOf(chosen), y2: height - bottom, stroke: C.ink, strokeWidth: 0.7, strokeDasharray: '2 2' }))
-    els.push(h(Text, { key: 'chosent', x: xOf(chosen) + 3, y: top + 7, style: { fontSize: 6.8 }, fill: C.ink }, `This room: ${chosen}%`))
-  }
-  const order = [...data.options].sort((a, b) => Number(a.selected) - Number(b.selected))
-  for (const o of order) {
-    const col = GLASS_COLOR[o.key]
-    const d = o.sweep.map((p, i) => `${i ? 'L' : 'M'}${xOf(p.rh).toFixed(2)} ${yOf(p.fog_days).toFixed(2)}`).join(' ')
-    els.push(h(Path, { key: `l${o.key}`, d, stroke: col, strokeWidth: o.selected ? 2 : 1.1, fill: 'none', strokeOpacity: o.selected ? 1 : 0.75 }))
-    o.sweep.forEach((p, i) => els.push(h(Circle, { key: `c${o.key}${i}`, cx: xOf(p.rh), cy: yOf(p.fog_days), r: o.selected ? 2 : 1.4, fill: col })))
-  }
-  els.push(h(Text, { key: 'xl', x: (left + width - right) / 2, y: height + 2, style: { fontSize: 6.8 }, fill: C.ink3, textAnchor: 'middle' }, ''))
-  return h(Svg, { width, height, viewBox: `0 0 ${width} ${height}` }, ...els)
-}
-
 function OptionsTable({ data }) {
-  const cols = [
-    { k: 'glass', label: 'Retrofit glass', w: 90 },
-    { k: 'u', label: 'Assembly U\nBtu/hr·ft²·°F', w: 58 },
-    { k: 'f', label: 'Glass\nfactor f', w: 44 },
-    { k: 'life', label: 'Desiccant keeps\nthe cavity dry for', w: 88 },
-    { k: 'first', label: 'First visible\nfog', w: 84 },
-    { k: 'days', label: 'Fog days\nper year', w: 44 },
-    { k: 'head', label: 'Long term, by\nroom humidity', w: 116 },
+  // Anas 2026-10-17: no "long term by room humidity" column, no ENTERED tag or
+  // estimate asterisk, and no desiccant column when there is no desiccant.
+  // The columns that remain share the full content width.
+  const withDesiccant = data.config.lb > 0
+  const base = [
+    { k: 'glass', label: 'Retrofit glass', w: 100 },
+    { k: 'u', label: 'Assembly U\nBtu/hr·ft²·°F', w: 70 },
+    { k: 'f', label: 'Glass\nfactor f', w: 56 },
+    ...(withDesiccant ? [{ k: 'life', label: 'Desiccant keeps\nthe cavity dry for', w: 100 }] : []),
+    { k: 'first', label: 'First visible\nfog', w: 100 },
+    { k: 'days', label: 'Fog days\nper year', w: 60 },
   ]
+  const total = base.reduce((a, c) => a + c.w, 0)
+  const cols = base.map((c) => ({ ...c, w: (c.w * CW) / total }))
+  const W = Object.fromEntries(cols.map((c) => [c.k, c.w]))
   const head = h(View, { style: { flexDirection: 'row', borderBottomWidth: 0.8, borderBottomColor: C.ink3, paddingBottom: 4 } },
     ...cols.map((c) => h(Text, { key: c.k, style: { width: c.w, fontSize: 7.2, color: C.ink3, fontWeight: 500, paddingRight: 6 } }, c.label)))
   const rows = data.options.map((o) => {
-    const cell = (k, txt, w, extra = {}) => h(Text, { key: k, style: { width: w, fontSize: 8.6, paddingRight: 6, lineHeight: 1.3, ...extra } }, txt)
+    const cell = (k, txt, extra = {}) => h(Text, { key: k, style: { width: W[k], fontSize: 8.6, paddingRight: 6, lineHeight: 1.3, ...extra } }, txt)
     return h(View, { key: o.key, style: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 0.6, borderBottomColor: C.lineSoft, backgroundColor: o.selected ? C.tealSoft : undefined } },
-      h(View, { style: { width: cols[0].w, flexDirection: 'row', alignItems: 'center' } },
+      h(View, { style: { width: W.glass, flexDirection: 'row', alignItems: 'center' } },
         h(View, { style: { width: 3, height: 22, backgroundColor: o.selected ? C.teal : 'transparent', marginRight: 6 } }),
         h(View, { style: { width: 7, height: 7, borderRadius: 4, backgroundColor: GLASS_COLOR[o.key], marginRight: 5 } }),
         h(View, null,
           h(Text, { style: { fontSize: 8.8, fontWeight: 600 } }, o.product),
           h(Text, { style: { fontSize: 7, color: C.ink3 } }, o.selected ? `${o.label}, this report` : o.label))),
-      o.thermal.u_entered
-        ? h(View, { key: 'u', style: { width: cols[1].w, paddingRight: 6 } },
-          h(Text, { style: { fontSize: 8.6, lineHeight: 1.3 } }, o.thermal.u_ip.toFixed(3)),
-          h(Text, { style: { fontSize: 6.6, color: C.tealInk, fontWeight: 600 } }, 'ENTERED'))
-        : cell('u', `${o.thermal.u_ip.toFixed(3)}${o.thermal.u_estimate ? '*' : ''}`, cols[1].w),
-      cell('f', o.thermal.f_cold.toFixed(3), cols[2].w),
-      cell('life', lifeText(o), cols[3].w),
-      cell('first', firstFogText(o), cols[4].w),
-      cell('days', String(o.fog_days_per_year), cols[5].w, { fontWeight: 600, color: o.fog_days_per_year ? C.fogInk : C.tealInk }),
-      cell('head', headroomText(o), cols[6].w))
+      cell('u', o.thermal.u_ip.toFixed(3)),
+      cell('f', o.thermal.f_cold.toFixed(3)),
+      withDesiccant ? cell('life', lifeText(o)) : null,
+      cell('first', firstFogText(o)),
+      cell('days', String(o.fog_days_per_year), { fontWeight: 600, color: o.fog_days_per_year ? C.fogInk : C.tealInk }))
   })
   return h(View, null, head, ...rows)
 }
 
+/**
+ * How the assessment works (Anas 2026-10-17): a short note on the method and
+ * the reasoning behind it, before the disclaimer. Without desiccant it says
+ * nothing about desiccant.
+ */
+export function methodItems(data) {
+  const lb = data.config.lb
+  return [
+    `Weather: the site's typical meteorological year from NREL's National Solar Radiation Database for the nearest grid cell, repeated each year.`,
+    `Glass temperature: every hour, the cavity side of the existing glass is set by the outdoor and room temperatures and the glass factor f of this pairing of existing and retrofit glass (from WINDOW thermal analysis)${data.config.facade.key === 'north' ? '; a north-facing window gets little direct sun' : `, plus the sun on a ${data.config.facade.label.toLowerCase()}-facing window`}.`,
+    `Moisture: air reaches the cavity through the existing window seal and the retrofit seal, driven by building pressurization, stack effect and wind, and water vapor diffuses through the sealant beads.${lb > 0 ? ' The desiccant takes up water until it is full.' : ''} An hourly moisture balance gives the dew point of the cavity air.`,
+    'Fog: when the glass is colder than that dew point, water condenses on it. A film thicker than about 5 µm counts as visible fog; it clears as the glass warms and the water evaporates.',
+    lb > 0
+      ? 'Run: hour by hour from installation on January 1 until the desiccant is full, plus one more year; the per-year figures come from the last simulated year.'
+      : 'Run: hour by hour for two years from installation on January 1. Year 1 starts from a clean pane, so the per-year figures come from year 2, the settled year.',
+  ]
+}
+
+function MethodNote({ data }) {
+  return h(View, { style: { marginTop: 14 }, wrap: false },
+    h(SectionTitle, null, 'How this assessment works'),
+    h(Bullets, { items: methodItems(data), size: 8.2 }))
+}
+
 function OptionsPage({ data }) {
   const cl = data.site.climate || {}
-  const est = data.options.some((o) => o.thermal.u_estimate)
-  const ent = data.options.find((o) => o.thermal.u_entered)
-  const best = [...data.options].sort((a, b) => a.fog_days_per_year - b.fog_days_per_year || (b.headroom.clear_up_to ?? 0) - (a.headroom.clear_up_to ?? 0))[0]
+  const lb = data.config.lb
   return h(Page, { size: 'LETTER', style: s.page },
-    h(TopBar, { data, title: 'Options and humidity headroom' }),
-    h(SectionTitle, { lead: `The same site, existing ${data.config.existing.label.toLowerCase()}, seals, desiccant and room air, with each INOVUES retrofit glass.` }, 'Retrofit glass options'),
+    h(TopBar, { data, title: 'Options and site climate' }),
+    h(SectionTitle, { lead: `The same site, existing ${data.config.existing.label.toLowerCase()}, seals${lb > 0 ? ', desiccant' : ''} and room air, with each INOVUES retrofit glass.` }, 'Retrofit glass options'),
     h(OptionsTable, { data }),
-    h(Text, { style: { ...s.small, marginTop: 5 } },
-      `Fog days per year are counted in the same simulation year as on page 1 for each option. ${est ? '* U estimated (existing double pane), pending a WINDOW result. ' : ''}${ent ? `Entered: ${ent.product} U typed in for this report (standard ${ent.thermal.u_table.toFixed(3)}); the other glasses use their standard U. ` : ''}${data.config.offset.changed ? `Cavity depth ${fmtIn(data.config.offset.inches)} in: it changes the cavity air volume only; f and U are the values for ${fmtIn(data.config.offset.standard)} in. ` : ''}Fewest fog days in this comparison: ${best.product}.`),
-    h(Text, { style: { ...s.small, marginTop: 3 } },
-      'Why a better-insulating retrofit can fog more: it keeps more heat in the room, so the existing glass in front of it runs colder. That is expected physics, not a defect; the seals and desiccant decide how much moisture reaches that cold glass.'),
 
-    h(View, { style: { marginTop: 14 }, wrap: false },
-      h(SectionTitle, { lead: 'Fog days per year by room humidity, long term: without desiccant, or once it is full.' }, 'Humidity headroom'),
-      h(HeadroomChart, { data, width: CW, height: 118 }),
-      h(View, { style: { flexDirection: 'row', marginTop: 6 } },
-        ...data.options.map((o) => h(View, { key: o.key, style: { flexDirection: 'row', alignItems: 'center', marginRight: 16 } },
-          h(View, { style: { width: 14, height: o.selected ? 2 : 1.2, backgroundColor: GLASS_COLOR[o.key], marginRight: 5 } }),
-          h(Text, { style: { fontSize: 7.8, color: C.ink2, fontWeight: o.selected ? 600 : 400 } }, `${o.product}: ${headroomText(o).toLowerCase()}`)))),
-      h(Text, { style: { ...s.small, marginTop: 4 } }, `Each point is a full hour-by-hour simulation, room at ${data.config.t}\u00a0°F. "Clear up to": the highest humidity tested (5\u00a0% steps) with no visible fog.`)),
-
-    h(View, { style: { marginTop: 14 }, wrap: false },
+    h(View, { style: { marginTop: 18 }, wrap: false },
       h(SectionTitle, { lead: `From the typical weather year the simulation uses: NREL ${data.site.weather || 'NSRDB'}, grid cell ${cellText(data.site.weather_cell)}.` }, 'Site climate'),
       h(Tiles, {
         items: [
@@ -557,6 +526,7 @@ function OptionsPage({ data }) {
           { label: 'FREEZING DAYS', value: fmt0(cl.freezing_days), sub: 'daily mean under 32 °F' },
         ],
       })),
+    h(MethodNote, { data }),
     h(Disclaimer),
     h(Footer, { data }))
 }

@@ -85,14 +85,15 @@ async function start(t, opts = {}) {
 
 const qs = (o = {}) => new URLSearchParams(Object.entries({ ...BASE, ...o }).filter(([, v]) => v !== null).map(([k, v]) => [k, String(v)])).toString()
 
-test('report data: three glasses, three sweeps, headroom, site, a link that reopens the scenario', async (t) => {
+test('report data: three glasses, no humidity sweeps (switched off 2026-10-17), site, a link that reopens the scenario', async (t) => {
   const s = await start(t)
   const r = await s.get(`/api/report.json?${qs({ glass: 'double' })}&project=Lobby`)
   assert.equal(r.status, 200, JSON.stringify(r.json))
   const d = r.json
   assert.equal(d.project, 'Lobby')
   assert.deepEqual(d.options.map((o) => [o.key, o.selected]), [['single', false], ['double', true], ['vig', false]])
-  assert.ok(d.options.every((o) => o.headroom.clear_up_to === 25 && o.sweep.length === RH_LEVELS.length))
+  assert.ok(d.options.every((o) => !('headroom' in o) && !('sweep' in o)), 'no headroom data in the report')
+  assert.equal('rh_levels' in d, false)
   assert.equal(d.options[1].thermal.u_ip, 0.249)
   assert.equal(d.config.glass.product, 'SWR-IG')
   assert.equal(d.config.seal_out.cfm_ft2, 0.005)
@@ -105,16 +106,11 @@ test('report data: three glasses, three sweeps, headroom, site, a link that reop
   assert.equal(link.searchParams.get('addr'), BASE.addr)
   assert.equal(link.searchParams.get('project'), null)
   assert.equal(s.f.calls.lifetime, 3)
-  assert.equal(s.f.calls.sweep, 3)
-  // the sweeps run without desiccant and report the settled year
-  const sw = s.f.calls.urls.find((u) => u.pathname === '/api/sweep')
-  assert.equal(sw.searchParams.get('grams'), '0')
-  assert.equal(sw.searchParams.get('x_key'), 'rh_room')
-  assert.equal(sw.searchParams.get('sweep_max_years'), '2')
+  assert.equal(s.f.calls.sweep, 0, 'no humidity sweeps while the headroom is off')
   // a second report on the same inputs is all cache
   await s.get(`/api/report.json?${qs({ glass: 'double' })}&project=Lobby`)
   assert.equal(s.f.calls.lifetime, 3)
-  assert.equal(s.f.calls.sweep, 3)
+  assert.equal(s.f.calls.sweep, 0)
 })
 
 test('report with a typed U: the chosen glass uses it, the other two keep their standard U', async (t) => {
@@ -137,7 +133,7 @@ test('report with a typed U: the chosen glass uses it, the other two keep their 
     const sent = u.searchParams.get('u_ip')
     if (sent === '0.18') assert.equal(u.searchParams.get('f_cold'), vigF, `${u.pathname}: typed U only for VIG`)
   }
-  assert.equal(s.f.calls.urls.filter((u) => u.searchParams.get('u_ip') === '0.18').length, 2, 'the VIG run and the VIG sweep')
+  assert.equal(s.f.calls.urls.filter((u) => u.searchParams.get('u_ip') === '0.18').length, 1, 'the VIG run only')
   assert.equal(new URL(d.link).searchParams.get('u'), '0.18', 'the link reopens the typed U')
 })
 
@@ -149,13 +145,13 @@ test('report PDF with a typed U still fits on 3 pages', async (t) => {
   assert.equal(pages, 3)
 })
 
-test('report with a changed offset: every glass and sweep uses it, the report says so', async (t) => {
+test('report with a changed offset: every glass uses it, the report says so', async (t) => {
   const s = await start(t)
   const r = await s.get(`/api/report.json?${qs({ offset: '1.5' })}`)
   assert.equal(r.status, 200, JSON.stringify(r.json))
   assert.deepEqual(r.json.config.offset, { inches: 1.5, standard: 0.6, changed: true })
   const engineCalls = s.f.calls.urls.filter((u) => u.searchParams.has('offset_in'))
-  assert.equal(engineCalls.length, 6, '3 runs + 3 sweeps')
+  assert.equal(engineCalls.length, 3, '3 runs, no sweeps')
   assert.ok(engineCalls.every((u) => u.searchParams.get('offset_in') === '1.5'))
   assert.equal(new URL(r.json.link).searchParams.get('offset'), '1.5')
   const std = await s.get(`/api/report.json?${qs()}`)
@@ -188,11 +184,24 @@ test('report PDF with a typed U and a changed offset still fits on 3 pages', asy
   assert.equal(pages, 3)
 })
 
-test('report: a sweep for the wrong input is refused, not drawn', async (t) => {
-  const s = await start(t, { sweepKey: 'al_out' })
-  const r = await s.get(`/api/report.json?${qs()}`)
-  assert.equal(r.status, 502)
-  assert.ok(r.json.detail.some((d) => /humidity points/.test(d)))
+// The humidity sweep is off in the report (2026-10-17) but kept in the engine
+// client for when the headroom returns; these keep it known-good.
+test('dormant humidity sweep: runs without desiccant, settled year, the requested points', async () => {
+  const f = fakeEngine()
+  const c = createEngineClient({ baseUrl: 'http://engine.test', fetchImpl: f.fetchImpl, retryDelayMs: 1 })
+  const pts = await c.sweepRh({ ...BASE, lb: 4 }, RH_LEVELS)
+  assert.deepEqual(pts.map((p) => p.rh), RH_LEVELS)
+  assert.equal(headroomOf(pts).clear_up_to, 25)
+  const sw = f.calls.urls.find((u) => u.pathname === '/api/sweep')
+  assert.equal(sw.searchParams.get('grams'), '0')
+  assert.equal(sw.searchParams.get('x_key'), 'rh_room')
+  assert.equal(sw.searchParams.get('sweep_max_years'), '2')
+})
+
+test('dormant humidity sweep: a sweep for the wrong input is refused', async () => {
+  const f = fakeEngine({ sweepKey: 'al_out' })
+  const c = createEngineClient({ baseUrl: 'http://engine.test', fetchImpl: f.fetchImpl, retryDelayMs: 1 })
+  await assert.rejects(c.sweepRh(BASE, RH_LEVELS), (e) => e.status === 502 && e.detail.some((d) => /humidity points/.test(d)))
 })
 
 test('report: bad project name is a 400 before any engine call', async (t) => {

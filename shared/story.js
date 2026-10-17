@@ -120,8 +120,10 @@ export function formatDayCount(n) {
 /**
  * The one-paragraph answer, as a list of sentences.
  * r: { lb, full_hour, first_fog_hour, capped, hours_run, max_years, years: [{ fog_hours, fog }] }
+ * quiet = true (the customer report, Anas 2026-10-17): with no desiccant the
+ * sentences do not mention desiccant at all. The page leaves it off.
  */
-export function summarize(r, { working = false } = {}) {
+export function summarize(r, { working = false, quiet = false } = {}) {
   const multi = r.hours_run > HOURS_PER_YEAR
   const date = (h) => formatDate(h, multi)
   const total = r.years.reduce((s, y) => s + y.fog_hours, 0)
@@ -130,8 +132,9 @@ export function summarize(r, { working = false } = {}) {
   const days = (n) => (working ? `${formatDayCount(n).replace('day', 'working day')}` : formatDayCount(n))
   if (r.lb === 0) {
     const f0 = firstFogHour(r, working)
-    if (f0 === null) return [working ? 'Without desiccant, the pane stays clear in working hours.' : 'Without desiccant, the pane stays clear all year.']
-    return [`Without desiccant, the pane fogs on about ${days(perYear)} a year.`, `The first fog${working ? ' in working hours' : ''} comes on ${date(f0)}.`]
+    const lead = quiet ? 'The pane' : 'Without desiccant, the pane'
+    if (f0 === null) return [working ? `${lead} stays clear in working hours.` : `${lead} stays clear all year.`]
+    return [`${lead} fogs on about ${days(perYear)} a year.`, `The first fog${working ? ' in working hours' : ''} comes on ${date(f0)}.`]
   }
 
   const full = r.full_hour
@@ -205,7 +208,7 @@ export function remainingOnDay(loadingPct, fullPct = 95) {
  *   3. how much fog                                  (amber, or neutral if none)
  * Each: { key, tone: 'dry' | 'fog' | 'none', label, value, detail }.
  */
-export function headlineCards(r, { working = false } = {}) {
+export function headlineCards(r, { working = false, quiet = false } = {}) {
   const multi = r.hours_run > HOURS_PER_YEAR
   const total = r.years.reduce((s, y) => s + y.fog_hours, 0)
   const fog = firstFogHour(r, working)          // follows the working-hours view
@@ -244,13 +247,15 @@ export function headlineCards(r, { working = false } = {}) {
   const of = working ? `, out of ${WORKING_HOURS.days} working days` : ''
   let amount
   if (r.lb === 0) {
-    amount = { tone, label: `${noun} per year`, value: formatDayCount(perYear), detail: perYear ? `Year ${lastYear}, a settled year without desiccant${of}` : 'The pane stays clear' }
+    amount = { tone, label: `${noun} per year`, value: formatDayCount(perYear), detail: perYear ? `Year ${lastYear}, a settled year${quiet ? '' : ' without desiccant'}${of}` : 'The pane stays clear' }
   } else if (full !== null) {
     amount = { tone, label: `${noun} per year once full`, value: formatDayCount(perYear), detail: perYear ? `Year ${lastYear}, the first full year after it fills${of}` : 'The pane stays clear' }
   } else {
     amount = { tone, label: `${noun} per year`, value: formatDayCount(perYear), detail: perYear ? `While the desiccant still works${of}` : 'The pane stays clear' }
   }
 
+  // quiet (the customer report) with no desiccant: no desiccant box at all.
+  if (quiet && r.lb === 0) return [{ key: 'first', ...first }, { key: 'amount', ...amount }]
   return [{ key: 'life', ...life }, { key: 'first', ...first }, { key: 'amount', ...amount }]
 }
 

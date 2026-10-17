@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { queryOf } from './api.js'
 
 // "Customer report": an optional project name, then the server builds the
-// PDF (5 simulations: this scenario, the two other retrofit glasses, and
-// humidity sweeps) and the browser saves it.
+// PDF (3 simulations: this scenario and the two other retrofit glasses; the
+// humidity sweeps were switched off 2026-10-17) and the browser saves it.
 
 function filenameOf(res) {
   const m = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')
@@ -86,7 +86,7 @@ export default function ReportDialog({ open, onClose, scenario, siteLabel }) {
         </div>
         <p className="modal-lead">
           A 3-page PDF for <strong>{siteLabel}</strong>: the outlook, the hour-by-hour calendar, all three
-          retrofit glasses compared, humidity headroom and the site climate.
+          retrofit glasses compared, the site climate and how the assessment works.
         </p>
         <label className="modal-label" htmlFor="report-project">Project or customer name <span>(optional, shown on the cover)</span></label>
         <input id="report-project" type="text" maxLength={80} value={project} placeholder="e.g. Lobby retrofit, phase 2"
@@ -96,7 +96,7 @@ export default function ReportDialog({ open, onClose, scenario, siteLabel }) {
             {state === 'working' ? `Building the report… ${elapsed} s` : state === 'done' ? 'Download again' : 'Create PDF'}
           </button>
           <span className="modal-note" aria-live="polite">
-            {state === 'working' && 'Runs 5 simulations. A new address takes about 20 seconds.'}
+            {state === 'working' && 'Runs 3 simulations. A new address takes about 10 seconds.'}
             {state === 'done' && 'Saved to your downloads.'}
             {state === 'error' && <span className="modal-error">{error}</span>}
           </span>
