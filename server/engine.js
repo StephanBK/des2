@@ -10,7 +10,7 @@
 //   5. An engine without the fog-map API is reported as out of date.
 
 import {
-  ADDRESS, EXISTING, FIXED, GLASSES, GRAMS_PER_LB, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, U_INPUT, YEARS_AFTER_FULL,
+  ADDRESS, EXISTING, FACADES, FIXED, GLASSES, GRAMS_PER_LB, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, U_INPUT, WINDOW_INPUT, YEARS_AFTER_FULL,
 } from '../shared/scenario.js'
 
 export class HttpError extends Error {
@@ -21,10 +21,16 @@ export class HttpError extends Error {
   }
 }
 
-const CONTROLS = ['ex', 'glass', 'u', 'offset', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+export const CONTROLS = ['ex', 'glass', 'u', 'offset', 'facade', 'width', 'height', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
 // Optional controls and the value they take when absent; a scenario at that
-// value keeps its pre-v2.5 cache key and report id.
-const OPTIONAL = { u: null, offset: OFFSET_INPUT.default }
+// value keeps its pre-v2.5 cache key and report id (facade, width and height
+// since v2.7: north, 60 x 96 in, the values that were fixed before).
+const OPTIONAL = { u: null, offset: OFFSET_INPUT.default, facade: 'north', width: WINDOW_INPUT.width, height: WINDOW_INPUT.height }
+
+/** True when an optional control is absent or at its default (left out of keys and links). */
+export function atDefault(k, v) {
+  return k in OPTIONAL && (v === undefined || v === null || v === OPTIONAL[k])
+}
 
 function intInRange(name, raw, { min, max, step }) {
   if (raw === null || raw === undefined || raw === '') throw new HttpError(400, `Missing ${name}`)
@@ -73,6 +79,18 @@ function offsetValue(raw) {
   return v
 }
 
+/** Facade orientation (v2.7): optional; absent or empty = north. */
+function facadeValue(raw) {
+  if (raw === null || raw === undefined || raw === '') return OPTIONAL.facade
+  return oneOf('facade', raw, FACADES)
+}
+
+/** Window width or height in whole inches (v2.7): optional; absent or empty = the default. */
+function windowSide(name, raw, fallback) {
+  if (raw === null || raw === undefined || raw === '') return fallback
+  return intInRange(name, raw, { min: WINDOW_INPUT.min, max: WINDOW_INPUT.max, step: 1 })
+}
+
 function coord(name, raw, limit) {
   if (!/^-?\d{1,3}(\.\d{1,12})?$/.test(raw)) throw new HttpError(400, `${name} must be a number in degrees, got "${raw}"`)
   const v = Number(raw)
@@ -102,6 +120,9 @@ export function parseScenario(params) {
     glass,
     u: normalizeU(ex, glass, uValue(params.get('u'))),
     offset: offsetValue(params.get('offset')),
+    facade: facadeValue(params.get('facade')),
+    width: windowSide('width', params.get('width'), WINDOW_INPUT.width),
+    height: windowSide('height', params.get('height'), WINDOW_INPUT.height),
     seal_out: oneOf('seal_out', params.get('seal_out'), SEALS_EXISTING),
     seal_in: oneOf('seal_in', params.get('seal_in'), SEALS_RETROFIT),
     lb: intInRange('lb', params.get('lb'), RANGES.lb),
@@ -117,7 +138,7 @@ export function parseScenario(params) {
 // scenario without a typed U or a changed offset keeps the key it had before
 // v2.5 (same cache keys, same report ids).
 export function scenarioKey(s) {
-  return CONTROLS.filter((k) => !(k in OPTIONAL) || (s[k] !== undefined && s[k] !== OPTIONAL[k]))
+  return CONTROLS.filter((k) => !atDefault(k, s[k]))
     .map((k) => `${k}=${k === 'addr' ? s[k].toLowerCase() : s[k]}`).join('&')
 }
 
@@ -128,6 +149,9 @@ export function engineParams(s) {
   return {
     address: s.addr,
     ...FIXED,
+    orientation: s.facade ?? OPTIONAL.facade,
+    width_in: s.width ?? WINDOW_INPUT.width,
+    height_in: s.height ?? WINDOW_INPUT.height,
     offset_in: s.offset ?? OFFSET_INPUT.default,
     // Without desiccant nothing ever fills, so the engine would play all
     // max_years years. Two are enough: year 1 starts from a clean pane and

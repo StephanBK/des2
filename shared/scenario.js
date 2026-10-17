@@ -78,6 +78,19 @@ export function thermalOf(existing, glass, u = null) {
 // and in the report).
 export const OFFSET_INPUT = { min: 0.25, max: 4, decimals: 2, default: 0.6 }
 
+// v2.7 (Anas 2026-10-17): facade orientation and window width and height are
+// inputs again (fixed since v2.0). The engine accepts these four orientations
+// and 1 to 400 in for each side; the page allows 12 to 240 in, whole inches.
+// At their defaults (north, 60 x 96 in) they stay out of links, cache keys and
+// report ids, so everything from before v2.7 keeps working unchanged.
+export const FACADES = [
+  { key: 'north', label: 'North' },
+  { key: 'east', label: 'East' },
+  { key: 'south', label: 'South' },
+  { key: 'west', label: 'West' },
+]
+export const WINDOW_INPUT = { min: 12, max: 240, width: 60, height: 96 }
+
 /** A typed U that equals the table value is no override: null, so links and caches stay clean. */
 export function normalizeU(existing, glass, u) {
   if (u === null || u === undefined) return null
@@ -102,12 +115,15 @@ export const SEALS_EXISTING = [
   { key: 'aged', label: 'Aged gaskets' },
   { key: 'baseline', label: 'Unsealed baseline' },
 ]
+// Retrofit labels renamed by Anas 2026-10-17 (keys unchanged, so links and
+// the engine presets still match): well-gasketed, best certified insert,
+// typical certified insert and vent slots became the dry-seal names below.
 export const SEALS_RETROFIT = [
   { key: 'wet_sealed', label: 'Wet-sealed' },
-  { key: 'gasketed', label: 'Well-gasketed' },
-  { key: 'certified_best', label: 'Best certified insert' },
-  { key: 'certified_typical', label: 'Typical certified insert' },
-  { key: 'vented', label: 'Vent slots' },
+  { key: 'gasketed', label: 'Dry-seal, max compression' },
+  { key: 'certified_best', label: 'Dry-seal, tight' },
+  { key: 'certified_typical', label: 'Dry-seal, good' },
+  { key: 'vented', label: 'Vented' },
 ]
 
 export const RANGES = {
@@ -127,14 +143,14 @@ export const SITE_TOL_DEG = 0.02            // about 2 km, the size of one weath
 // A known address for tests and examples only; never pre-filled on the page.
 export const EXAMPLE_SITE = { addr: '350 Fifth Avenue, New York, New York 10118, United States', lat: 40.74844, lon: -73.98566 }
 
-export const DEFAULTS = { ex: 'single', glass: 'vig', u: null, offset: OFFSET_INPUT.default, seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, addr: '', lat: null, lon: null }
+export const DEFAULTS = { ex: 'single', glass: 'vig', u: null, offset: OFFSET_INPUT.default, facade: 'north', width: WINDOW_INPUT.width, height: WINDOW_INPUT.height, seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, addr: '', lat: null, lon: null }
 
 // Every hidden engine input is pinned explicitly (not left to engine
 // defaults), so an engine default change cannot move these results, and
 // every one of them is checked against the engine's echo.
+// orientation, width_in, height_in (v2.7) and offset_in (v2.6) come from the
+// scenario, not from here.
 export const FIXED = {
-  orientation: 'north',
-  width_in: 60, height_in: 96,     // offset_in comes from the scenario (v2.6)
   r_ip: 0.97,                 // f_cold and u_ip come from THERMAL, not fixed
   desiccant: 'ms3a',
   desorption: true,
@@ -156,8 +172,8 @@ export const WORKING_HOURS = { start: 8, end: 18, days: 261, hours: 2610, label:
 
 // Plain-language list of what is fixed, for the assumptions drawer.
 export const FIXED_DESCRIPTION = [
-  ['Building', 'North facade, so no sun warms the glass (the cautious case). Window at mid-height of a 20-story building, where the stack effect is close to zero.'],
-  ['Window', '60 × 96 in. The cavity depth between the existing glass and the retrofit is an input, 0.6 in unless changed.'],
+  ['Building', 'Window at mid-height of a 20-story building, where the stack effect is close to zero. The facade orientation is an input, north unless changed (no direct sun warms the glass, the cautious case); it sets how much sun reaches the glass and which winds press on the facade.'],
+  ['Window', 'Width and height are inputs, 60 × 96 in unless changed. The cavity depth between the existing glass and the retrofit is an input too, 0.6 in unless changed.'],
   ['Weather', 'Typical meteorological year for the site (NREL NSRDB), repeated every year.'],
   ['Start', 'Installation on January 1 with a fresh desiccant.'],
   ['Desiccant', '3A molecular sieve. It can release water again when warm (desorption on).'],

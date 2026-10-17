@@ -81,7 +81,7 @@ const s = StyleSheet.create({
 function Footer({ data }) {
   const place = (data.site.matched || data.site.query).split(',').slice(0, 2).join(',')
   return h(View, { style: s.footer, fixed: true },
-    h(Text, null, 'INOVUES, Inc.  ·  inovues.com  ·  Cavity condensation assessment'),
+    h(Text, null, 'INOVUES, Inc.  ·  inovues.com  ·  SWR Condensation Assessment'),
     h(Text, null, `${place}  ·  Report ${data.id}`),
     h(Text, { render: ({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}` }))
 }
@@ -211,7 +211,7 @@ function SummaryPage({ data }) {
   const seal = (x) => `${x.label}${x.cfm_ft2 !== null ? `, ${x.cfm_ft2} cfm/ft² at 75 Pa` : ''}`
 
   return h(Page, { size: 'LETTER', style: s.page },
-    h(TopBar, { data, title: 'Cavity condensation assessment' }),
+    h(TopBar, { data, title: 'SWR Condensation Assessment' }),
     data.project ? h(Text, { style: s.eyebrow }, data.project.toUpperCase()) : null,
     h(Text, { style: s.h1 }, street),
     rest ? h(Text, { style: s.h1sub }, rest) : null,
@@ -234,8 +234,8 @@ function SummaryPage({ data }) {
         h(KV, { k: 'Location', v: data.site.location ? cellText([data.site.location.lat, data.site.location.lon]) : 'n/a' }),
         h(KV, { k: 'Weather data', v: 'NREL NSRDB typical year' }),
         h(KV, { k: 'Weather cell', v: cellText(data.site.weather_cell) }),
-        h(KV, { k: 'Facade', v: 'North, no sun on the glass' }),
-        h(KV, { k: 'Window', v: '60 × 96 in, at mid-height' })),
+        h(KV, { k: 'Facade', v: `${cfg.facade.label}-facing` }),
+        h(KV, { k: 'Window', v: `${cfg.window.width} × ${cfg.window.height} in, at mid-height` })),
       h(View, { style: { flex: 1 } },
         h(Text, { style: s.h3 }, 'Window assembly'),
         h(KV, { k: 'Existing glass', v: cfg.existing.label }),
@@ -573,10 +573,10 @@ function Disclaimer() {
 export async function renderReportPdf(data) {
   registerFonts()
   const doc = h(Document, {
-    title: `Cavity condensation assessment: ${data.site.matched || data.site.query}`,
+    title: `SWR Condensation Assessment: ${data.site.matched || data.site.query}`,
     author: 'INOVUES, Inc.',
-    subject: 'Secondary window retrofit cavity condensation assessment',
-    creator: `INOVUES cavity fog outlook ${data.app_version}`,
+    subject: 'SWR Condensation Assessment: secondary window retrofit cavity condensation',
+    creator: `INOVUES SWR Condensation Assessment ${data.app_version}`,
     producer: 'INOVUES',
   },
   h(SummaryPage, { data }),

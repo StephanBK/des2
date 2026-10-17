@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import {
   climateOf, createEngineClient, ECHO_EXEMPT, ECHO_KEYS, engineParams, HttpError, parseScenario, scenarioKey,
 } from '../server/engine.js'
-import { ADDRESS, DEFAULTS, EXAMPLE_SITE, EXISTING, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT, THERMAL, thermalOf } from '../shared/scenario.js'
+import { ADDRESS, DEFAULTS, EXAMPLE_SITE, EXISTING, FACADES, FIXED, GLASSES, GRAMS_PER_LB, RANGES, SEALS_EXISTING, SEALS_RETROFIT, THERMAL, thermalOf, WINDOW_INPUT } from '../shared/scenario.js'
 
 // The page's defaults have no address (v2.4); tests add a known one.
 const BASE = { ...DEFAULTS, ...EXAMPLE_SITE }
@@ -37,6 +37,16 @@ test('every control option parses', () => {
     assert.equal(parseScenario(q({ ...BASE, glass: g.key, seal_out: o.key, seal_in: i.key })).glass, g.key)
   }
   for (let lb = RANGES.lb.min; lb <= RANGES.lb.max; lb++) assert.equal(parseScenario(q({ ...BASE, lb })).lb, lb)
+})
+
+test('retrofit seal labels (Anas 2026-10-17): new names, engine keys unchanged', () => {
+  assert.deepEqual(SEALS_RETROFIT.map((s) => [s.key, s.label]), [
+    ['wet_sealed', 'Wet-sealed'],
+    ['gasketed', 'Dry-seal, max compression'],
+    ['certified_best', 'Dry-seal, tight'],
+    ['certified_typical', 'Dry-seal, good'],
+    ['vented', 'Vented'],
+  ])
 })
 
 test('hermetic is not accepted on either side', () => {
@@ -398,4 +408,74 @@ test('offset: the engine echo check covers it', async () => {
   await c.run(parseScenario(q({ ...BASE, offset: '1.75' })))
   const sent = f.calls.urls.find((u) => u.searchParams.has('offset_in'))
   assert.equal(sent.searchParams.get('offset_in'), '1.75')
+})
+
+// ------------------------------------------------------------ facade and window size (v2.7)
+
+test('facade: optional (north when absent), one of the four the engine accepts', () => {
+  const f = (raw) => parseScenario(q({ ...BASE, facade: raw })).facade
+  assert.deepEqual(FACADES.map((x) => x.key), ['north', 'east', 'south', 'west'])
+  assert.equal(parseScenario(q({ ...BASE, facade: null })).facade, 'north', 'absent = north')
+  assert.equal(f(''), 'north')
+  for (const x of FACADES) assert.equal(f(x.key), x.key)
+  for (const bad of ['North', 'n', 'northeast', 'up', ' south']) {
+    assert.throws(() => f(bad), (e) => e instanceof HttpError && e.status === 400 && /^facade must/.test(e.message), bad)
+  }
+})
+
+test('window width and height: optional (60 x 96 when absent), whole inches 12 to 240', () => {
+  const w = (raw) => parseScenario(q({ ...BASE, width: raw })).width
+  const h = (raw) => parseScenario(q({ ...BASE, height: raw })).height
+  const s = parseScenario(q({ ...BASE, width: null, height: null }))
+  assert.equal(s.width, 60)
+  assert.equal(s.height, 96)
+  assert.equal(w(''), 60)
+  assert.equal(w('12'), 12)
+  assert.equal(w('240'), 240)
+  assert.equal(h('48'), 48)
+  for (const bad of ['11', '241', '60.5', 'x', '-60', '1e2', ' 60']) {
+    assert.throws(() => w(bad), (e) => e instanceof HttpError && e.status === 400 && /^width must/.test(e.message), `width ${bad}`)
+    assert.throws(() => h(bad), (e) => e instanceof HttpError && e.status === 400 && /^height must/.test(e.message), `height ${bad}`)
+  }
+  // the page range sits inside the engine's own limits (1 to 400 in)
+  assert.ok(WINDOW_INPUT.min >= 1 && WINDOW_INPUT.max <= 400)
+})
+
+test('facade and window size reach the engine as orientation, width_in, height_in', () => {
+  const a = engineParams(parseScenario(q(BASE)))
+  assert.deepEqual([a.orientation, a.width_in, a.height_in], ['north', 60, 96], 'defaults = the values fixed before v2.7')
+  const b = engineParams(parseScenario(q({ ...BASE, facade: 'south', width: '48', height: '120' })))
+  assert.deepEqual([b.orientation, b.width_in, b.height_in], ['south', 48, 120])
+  assert.equal(b.f_cold, a.f_cold)
+  assert.equal(b.u_ip, a.u_ip)
+  for (const k of ['orientation', 'width_in', 'height_in']) assert.equal(k in FIXED, false, `${k} comes from the scenario, not FIXED`)
+})
+
+test('cache key: unchanged at north and 60 x 96, different otherwise', () => {
+  const a = parseScenario(q(BASE))
+  const b = parseScenario(q({ ...BASE, facade: 'north', width: '60', height: '96' }))
+  assert.equal(scenarioKey(a), scenarioKey(b))
+  for (const k of ['facade=', 'width=', 'height=']) assert.equal(scenarioKey(a).includes(k), false, `pre-v2.7 keys (and report ids) stay the same: ${k}`)
+  for (const change of [{ facade: 'east' }, { width: '61' }, { height: '95' }]) {
+    assert.notEqual(scenarioKey(a), scenarioKey(parseScenario(q({ ...BASE, ...change }))), JSON.stringify(change))
+  }
+})
+
+test('cache key: a scenario from before v2.7 (no facade, width or height at all) keeps its exact key', () => {
+  // The literal key format a v2.6 scenario produced; it must not change.
+  const { facade, width, height, ...old } = parseScenario(q(BASE))
+  const expected = `ex=single&glass=vig&seal_out=wet_sealed&seal_in=wet_sealed&lb=0&t=70&rh=30&addr=${BASE.addr.toLowerCase()}&lat=${BASE.lat}&lon=${BASE.lon}`
+  assert.equal(scenarioKey(old), expected)
+  assert.equal(scenarioKey(parseScenario(q(BASE))), expected)
+})
+
+test('facade and window size: the engine echo check covers them', async () => {
+  const { f, c } = client()
+  await c.run(parseScenario(q({ ...BASE, facade: 'west', width: '30', height: '72' })))
+  const sent = f.calls.urls.find((u) => u.pathname === '/api/lifetime')
+  assert.equal(sent.searchParams.get('orientation'), 'west')
+  assert.equal(sent.searchParams.get('width_in'), '30')
+  assert.equal(sent.searchParams.get('height_in'), '72')
+  const { c: c2 } = client({ ignore: ['orientation'] })
+  await assert.rejects(c2.run(parseScenario(q({ ...BASE, facade: 'east' }))), (e) => e.status === 502 && e.detail.some((d) => d.startsWith('orientation')))
 })

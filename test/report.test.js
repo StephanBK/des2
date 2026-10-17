@@ -163,6 +163,23 @@ test('report with a changed offset: every glass and sweep uses it, the report sa
   assert.equal(new URL(std.json.link).searchParams.has('offset'), false)
 })
 
+test('report with a facade and window size (v2.7): every glass uses them, the report shows them, the link reopens them', async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report.json?${qs({ facade: 'south', width: '48', height: '120' })}`)
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.deepEqual(r.json.config.facade, { key: 'south', label: 'South' })
+  assert.deepEqual(r.json.config.window, { width: 48, height: 120 })
+  const runs = s.f.calls.urls.filter((u) => u.pathname === '/api/lifetime')
+  assert.equal(runs.length, 3)
+  assert.ok(runs.every((u) => u.searchParams.get('orientation') === 'south' && u.searchParams.get('width_in') === '48' && u.searchParams.get('height_in') === '120'))
+  const link = new URL(r.json.link).searchParams
+  assert.deepEqual([link.get('facade'), link.get('width'), link.get('height')], ['south', '48', '120'])
+  const std = await s.get(`/api/report.json?${qs()}`)
+  assert.deepEqual(std.json.config.facade, { key: 'north', label: 'North' })
+  assert.deepEqual(std.json.config.window, { width: 60, height: 96 })
+  for (const k of ['facade', 'width', 'height']) assert.equal(new URL(std.json.link).searchParams.has(k), false, k)
+})
+
 test('report PDF with a typed U and a changed offset still fits on 3 pages', async (t) => {
   const s = await start(t)
   const r = await s.get(`/api/report?${qs({ ex: 'double', glass: 'vig', u: '0.180', offset: '2.25' })}&project=${encodeURIComponent('Long project name '.repeat(4).trim())}`)
@@ -192,7 +209,7 @@ test('report PDF: a 3-page PDF, downloadable, named after the site and report id
   assert.equal(r.headers['content-type'], 'application/pdf')
   assert.equal(r.body.subarray(0, 5).toString(), '%PDF-')
   const cd = r.headers['content-disposition']
-  assert.match(cd, /^attachment; filename="INOVUES-cavity-assessment-350-Fifth-Avenue-[0-9A-Z]{7}\.pdf"$/)
+  assert.match(cd, /^attachment; filename="INOVUES-SWR-condensation-assessment-350-Fifth-Avenue-[0-9A-Z]{7}\.pdf"$/)
   const pages = (r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length
   assert.equal(pages, 3)
 })

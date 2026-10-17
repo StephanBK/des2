@@ -1,7 +1,7 @@
-// Cavity fog outlook (des2): web server.
+// SWR Condensation Assessment (des2, formerly "Cavity fog outlook"): web server.
 //
 // Serves the built page from dist/ and these API routes:
-//   GET /api/run?ex=&glass=[&u=][&offset=]&seal_out=&seal_in=&lb=&t=&rh=&addr=[&lat=&lon=]   one simulation
+//   GET /api/run?ex=&glass=[&u=][&offset=][&facade=][&width=][&height=]&seal_out=&seal_in=&lb=&t=&rh=&addr=[&lat=&lon=]   one simulation
 //   GET /api/suggest?q=                                 address suggestions (Mapbox)
 //   GET /api/report?<run params>[&project=]             customer report, PDF
 //   GET /api/report.json?<run params>[&project=]        the same report's data
@@ -18,12 +18,12 @@ import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 
 import { coalescer, LruCache } from './cache.js'
-import { createEngineClient, HttpError, parseScenario, scenarioKey } from './engine.js'
+import { atDefault, CONTROLS, createEngineClient, HttpError, parseScenario, scenarioKey } from './engine.js'
 import { buildReportData, cleanProject } from './report-data.js'
 import { renderReportPdf } from './report-pdf.js'
 import { createSuggester } from './suggest.js'
 import {
-  APP_VERSION, ASSUMPTIONS, DEFAULTS, ENGINE_DEFAULT_URL, EXISTING, FIXED_DESCRIPTION, GLASSES, OFFSET_INPUT, RANGES, THERMAL,
+  APP_VERSION, ASSUMPTIONS, DEFAULTS, ENGINE_DEFAULT_URL, EXISTING, FIXED_DESCRIPTION, GLASSES, RANGES, THERMAL,
   SEALS_EXISTING, SEALS_RETROFIT,
 } from '../shared/scenario.js'
 
@@ -118,8 +118,9 @@ export function createApp({
     const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost'
     const proto = req.headers['x-forwarded-proto'] || (/^(localhost|127\.)/.test(host) ? 'http' : 'https')
     const q = new URLSearchParams()
-    for (const k of ['ex', 'glass', 'u', 'offset', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']) {
-      if (k === 'offset' && scenario.offset === OFFSET_INPUT.default) continue
+    // Optional controls at their default stay out of the link (as on the page).
+    for (const k of CONTROLS) {
+      if (atDefault(k, scenario[k])) continue
       if (scenario[k] !== null && scenario[k] !== undefined) q.set(k, String(scenario[k]))
     }
     return { scenario, project, key: `${scenarioKey(scenario)}|${project}`, appUrl: `${proto}://${host}/?${q}` }
@@ -151,7 +152,7 @@ export function createApp({
     const place = (data.site.matched || data.site.query).split(',')[0].replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
     send(req, res, 200, pdf, 'application/pdf', {
       'cache-control': 'no-store',
-      'content-disposition': `attachment; filename="INOVUES-cavity-assessment-${place || 'site'}-${data.id}.pdf"`,
+      'content-disposition': `attachment; filename="INOVUES-SWR-condensation-assessment-${place || 'site'}-${data.id}.pdf"`,
     })
   }
 
@@ -230,5 +231,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const port = Number(process.env.PORT) || 3000
   const app = createApp()
   app.requestTimeout = 180_000
-  app.listen(port, () => console.log(`Cavity fog outlook on :${port}, engine ${process.env.ENGINE_URL || ENGINE_DEFAULT_URL}, address suggestions ${process.env.MAPBOX_TOKEN ? 'on' : 'off (no MAPBOX_TOKEN)'}`))
+  app.listen(port, () => console.log(`SWR Condensation Assessment on :${port}, engine ${process.env.ENGINE_URL || ENGINE_DEFAULT_URL}, address suggestions ${process.env.MAPBOX_TOKEN ? 'on' : 'off (no MAPBOX_TOKEN)'}`))
 }

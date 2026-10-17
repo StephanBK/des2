@@ -1,8 +1,12 @@
 // The page's side of /api/run and /api/config.
 
-import { ADDRESS, DEFAULTS, EXISTING, GLASSES, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, U_INPUT } from '../../shared/scenario.js'
+import { ADDRESS, DEFAULTS, EXISTING, FACADES, GLASSES, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, U_INPUT, WINDOW_INPUT } from '../../shared/scenario.js'
 
-const ORDER = ['ex', 'glass', 'u', 'offset', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+const ORDER = ['ex', 'glass', 'u', 'offset', 'facade', 'width', 'height', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+
+// Optional controls left out of links (and the server's cache key) at their
+// default, so links from before v2.6 / v2.7 stay the same.
+const LINK_DEFAULTS = { offset: OFFSET_INPUT.default, facade: DEFAULTS.facade, width: DEFAULTS.width, height: DEFAULTS.height }
 
 export class ApiError extends Error {
   constructor(message, status, detail) {
@@ -13,10 +17,10 @@ export class ApiError extends Error {
 }
 
 // lat/lon are left out when the address was typed rather than picked.
-// An empty address (nothing entered yet) is left out too, and so is the
-// standard 0.6 in offset, so links from before v2.6 stay the same.
+// An empty address (nothing entered yet) is left out too, and so are the
+// standard offset, facade and window size (LINK_DEFAULTS).
 export function queryOf(s) {
-  const keep = (k) => s[k] !== null && s[k] !== undefined && s[k] !== '' && !(k === 'offset' && s[k] === OFFSET_INPUT.default)
+  const keep = (k) => s[k] !== null && s[k] !== undefined && s[k] !== '' && !(k in LINK_DEFAULTS && s[k] === LINK_DEFAULTS[k])
   return new URLSearchParams(ORDER.filter(keep).map((k) => [k, String(s[k])])).toString()
 }
 
@@ -94,6 +98,14 @@ export function parseOffset(raw) {
   return v >= OFFSET_INPUT.min && v <= OFFSET_INPUT.max ? v : null
 }
 
+/** Window width or height text (the URL or the box): whole inches in WINDOW_INPUT's range; null when empty or invalid. */
+export function parseWindowSide(raw) {
+  const t = String(raw ?? '').trim()
+  if (!/^\d{1,3}$/.test(t)) return null
+  const v = Number(t)
+  return v >= WINDOW_INPUT.min && v <= WINDOW_INPUT.max ? v : null
+}
+
 function coord(raw, limit) {
   if (raw === null || !/^-?\d{1,3}(\.\d{1,12})?$/.test(raw)) return null
   const v = Number(raw)
@@ -119,6 +131,9 @@ export function readUrlScenario(search = window.location.search) {
     glass,
     u: normalizeU(ex, glass, parseU(p.get('u'))),
     offset: parseOffset(p.get('offset')) ?? OFFSET_INPUT.default,
+    facade: pick(p.get('facade'), FACADES, DEFAULTS.facade),
+    width: parseWindowSide(p.get('width')) ?? DEFAULTS.width,
+    height: parseWindowSide(p.get('height')) ?? DEFAULTS.height,
     seal_out: pick(p.get('seal_out'), SEALS_EXISTING, DEFAULTS.seal_out),
     seal_in: pick(p.get('seal_in'), SEALS_RETROFIT, DEFAULTS.seal_in),
     lb: num(p.get('lb'), RANGES.lb, DEFAULTS.lb),

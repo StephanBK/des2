@@ -6,7 +6,7 @@ import ReportDialog from './ReportDialog.jsx'
 import { fetchConfig, peek, queryOf, readUrlHours, readUrlScenario, runScenario, writeUrlScenario } from './api.js'
 import Assumptions from './Assumptions.jsx'
 import Cavity from './Cavity.jsx'
-import { AssemblyBar, DesiccantSlider, dewPointF, OffsetField, RoomSliders, SealLadder } from './Controls.jsx'
+import { AssemblyBar, DesiccantSlider, dewPointF, FacadeSwitch, OffsetField, RoomSliders, SealLadder, WindowSizeField } from './Controls.jsx'
 import FogCalendar, { Legend } from './FogCalendar.jsx'
 
 function ErrorPanel({ error, onRetry }) {
@@ -105,8 +105,8 @@ export default function App() {
           <img className="word" src="/inovues-wordmark.png" alt="INOVUES" width="118" height="23" />
         </div>
         <div className="title">
-          <h1>Cavity fog outlook</h1>
-          <p>Secondary window retrofit: how long the desiccant lasts, and when the pane fogs</p>
+          <h1>SWR Condensation Assessment</h1>
+          <p>Secondary window retrofit: when and how often the existing glass fogs</p>
         </div>
         <div className="head-actions">
           <button type="button" className="report-btn" onClick={() => setReport(true)} disabled={!!error || !data} aria-label="Customer report (PDF)">
@@ -164,6 +164,8 @@ export default function App() {
             <div className="under">
               <DesiccantSlider value={scenario.lb} onChange={(v) => update({ lb: v }, 'slider')} />
               <OffsetField value={scenario.offset} onChange={(v) => update({ offset: v })} />
+              <WindowSizeField width={scenario.width} height={scenario.height} onChange={(patch) => update(patch)} />
+              <FacadeSwitch value={scenario.facade} onChange={(k) => update({ facade: k })} />
             </div>
           </div>
 

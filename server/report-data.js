@@ -8,8 +8,8 @@
 //      (headroom: up to which room RH the pane stays clear long term)
 
 import {
-  APP_VERSION, ASSUMPTIONS, EXISTING, FIXED_DESCRIPTION, GLASSES, GRAMS_PER_LB, OFFSET_INPUT, SEALS_EXISTING, SEALS_RETROFIT,
-  thermalOf, WORKING_HOURS,
+  APP_VERSION, ASSUMPTIONS, EXISTING, FACADES, FIXED_DESCRIPTION, GLASSES, GRAMS_PER_LB, OFFSET_INPUT, SEALS_EXISTING, SEALS_RETROFIT,
+  thermalOf, WINDOW_INPUT, WORKING_HOURS,
 } from '../shared/scenario.js'
 import {
   fogDaysPerYear, headlineCards, HOURS_PER_YEAR, MONTH_SHORT, MONTH_START_DAY, summarize, yearStats,
@@ -139,6 +139,9 @@ export async function buildReportData(scenario, { project = '', runCached, sweep
       glass: { key: glass.key, label: glass.label, product: glass.product },
       thermal: th,
       offset: { inches: scenario.offset ?? OFFSET_INPUT.default, standard: OFFSET_INPUT.default, changed: (scenario.offset ?? OFFSET_INPUT.default) !== OFFSET_INPUT.default },
+      // v2.7: facade and window size from the scenario (north, 60 x 96 in when absent)
+      facade: FACADES.find((f) => f.key === (scenario.facade ?? 'north')),
+      window: { width: scenario.width ?? WINDOW_INPUT.width, height: scenario.height ?? WINDOW_INPUT.height },
       seal_out: sealInfo(SEALS_EXISTING, scenario.seal_out, p?.meta?.al_out),
       seal_in: sealInfo(SEALS_RETROFIT, scenario.seal_in, p?.meta?.al_in),
       lb: scenario.lb,

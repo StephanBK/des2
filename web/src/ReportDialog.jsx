@@ -7,7 +7,7 @@ import { queryOf } from './api.js'
 
 function filenameOf(res) {
   const m = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')
-  return m ? m[1] : 'INOVUES-cavity-assessment.pdf'
+  return m ? m[1] : 'INOVUES-SWR-condensation-assessment.pdf'
 }
 
 export default function ReportDialog({ open, onClose, scenario, siteLabel }) {

@@ -49,3 +49,31 @@ test('link: offset read back, 0.6 in left out, invalid falls back to 0.6', () =>
   assert.equal(new URLSearchParams(queryOf(s)).has('offset'), false, 'old links stay identical')
   assert.match(queryOf({ ...s, offset: 2 }), /&glass=vig&offset=2&seal_out=/)
 })
+
+// ---- v2.7: facade and window size in the link
+
+test('window size text: whole inches, null outside 12 to 240', async () => {
+  const { parseWindowSide } = await import('../web/src/api.js')
+  assert.equal(parseWindowSide('60'), 60)
+  assert.equal(parseWindowSide(' 48 '), 48)
+  assert.equal(parseWindowSide('12'), 12)
+  assert.equal(parseWindowSide('240'), 240)
+  for (const bad of ['', null, '11', '241', '60.5', 'x', '-60', '6O', '1e2']) assert.equal(parseWindowSide(bad), null, String(bad))
+})
+
+test('link: facade and window size read back; defaults and invalid values fall back to north, 60 x 96', () => {
+  const site = `&addr=${encodeURIComponent(EXAMPLE_SITE.addr)}`
+  const a = readUrlScenario(`?facade=south&width=48&height=120${site}`)
+  assert.deepEqual([a.facade, a.width, a.height], ['south', 48, 120])
+  const b = readUrlScenario(`?facade=up&width=5&height=abc${site}`)
+  assert.deepEqual([b.facade, b.width, b.height], ['north', 60, 96])
+  const old = readUrlScenario(`?ex=single&glass=vig${site}`)
+  assert.deepEqual([old.facade, old.width, old.height], ['north', 60, 96], 'a pre-v2.7 link opens with the old fixed values')
+})
+
+test('link: facade and window size left out at their defaults, in order after the offset when set', () => {
+  const s = { ...DEFAULTS, ...EXAMPLE_SITE }
+  const p = new URLSearchParams(queryOf(s))
+  for (const k of ['facade', 'width', 'height']) assert.equal(p.has(k), false, `old links stay identical: ${k}`)
+  assert.match(queryOf({ ...s, facade: 'east', width: 30, height: 72 }), /&glass=vig&facade=east&width=30&height=72&seal_out=/)
+})

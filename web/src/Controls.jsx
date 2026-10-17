@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { EXISTING, GLASSES, glassTip, normalizeU, OFFSET_INPUT, RANGES, thermalOf, U_INPUT } from '../../shared/scenario.js'
-import { parseOffset, parseU } from './api.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { EXISTING, FACADES, GLASSES, glassTip, normalizeU, OFFSET_INPUT, RANGES, thermalOf, U_INPUT, WINDOW_INPUT } from '../../shared/scenario.js'
+import { parseOffset, parseU, parseWindowSide } from './api.js'
 
 // Leak bar length on a log scale: the ladders span 0.005 to 2.0 cfm/ft2,
 // a factor of 400, so a linear bar would show everything but the last rung
@@ -43,8 +43,10 @@ export function SealLadder({ title, items, value, onPick, engineValues }) {
         {items.map((it) => {
           const eng = engineValues?.find((e) => e.key === it.key)?.engine
           const frac = leakFraction(eng?.al_cfm_ft2)
+          // The app's label, not the engine's: the retrofit names were changed
+          // in the app (2026-10-17) and the engine still has the old ones.
           const tip = eng
-            ? `${eng.label}. Rated air leakage ${eng.al_cfm_ft2} cfm/ft² at 75 Pa${eng.estimate ? ' (estimate)' : ''}.`
+            ? `${it.label}. Rated air leakage ${eng.al_cfm_ft2} cfm/ft² at 75 Pa${eng.estimate ? ' (estimate)' : ''}.`
             : it.label
           const on = value === it.key
           return (
@@ -251,6 +253,93 @@ export function OffsetField({ value, onChange }) {
           : changed
             ? `Changes the cavity air volume; f and U stay at their ${fmt(std)} in values.`
             : `Standard ${fmt(std)} in · type a value and press Enter`}
+      </p>
+    </Group>
+  )
+}
+
+/**
+ * Facade orientation (v2.7, Anas 2026-10-17): which way the window faces.
+ * North is the default and the cautious case (no direct sun on the glass).
+ */
+export function FacadeSwitch({ value, onChange }) {
+  const picked = FACADES.find((f) => f.key === value) ?? FACADES[0]
+  return (
+    <Group title="Facade" hint="Which way the window faces">
+      <div className="seg four" role="radiogroup" aria-label="Facade orientation">
+        {FACADES.map((f) => (
+          <button key={f.key} type="button" role="radio" aria-checked={value === f.key}
+            className={value === f.key ? 'on' : ''} onClick={() => onChange(f.key)}>{f.label}</button>
+        ))}
+      </div>
+      <p className="num-help">
+        {picked.key === 'north'
+          ? 'North: no direct sun on the glass, the cautious case.'
+          : `${picked.label}-facing: sets the sun on the glass and the winds on the facade.`}
+      </p>
+    </Group>
+  )
+}
+
+/** One whole-inch box for the window size; same behaviour as the cavity depth box. */
+function InchBox({ id, label, value, std, onChange, onBad }) {
+  const [text, setText] = useState(String(value))
+  const [bad, setBad] = useState(false)
+  const box = useRef(null)
+  const escaped = useRef(false)
+  useEffect(() => { setText(String(value)); setBad(false) }, [value])
+  useEffect(() => { onBad(id, bad) }, [id, bad, onBad])
+
+  const commit = () => {
+    if (escaped.current) { escaped.current = false; return }
+    if (text.trim() === '') { setBad(false); setText(String(std)); if (value !== std) onChange(std); return }
+    const v = parseWindowSide(text)
+    if (v === null) { setBad(true); return }
+    setBad(false)
+    setText(String(v))
+    if (v !== value) onChange(v)
+  }
+  return (
+    <div className={`num-box small${value !== std ? ' entered' : ''}${bad ? ' bad' : ''}`} onClick={() => box.current?.focus()}>
+      <input id={id} ref={box} type="text" inputMode="numeric" autoComplete="off" spellCheck="false"
+        value={text} aria-invalid={bad} aria-describedby="window-help" aria-label={label}
+        onChange={(e) => { setText(e.target.value); setBad(false) }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit() }
+          if (e.key === 'Escape') { escaped.current = true; setText(String(value)); setBad(false); e.currentTarget.blur() }
+        }} />
+    </div>
+  )
+}
+
+/**
+ * Window width and height (v2.7, Anas 2026-10-17), whole inches, 60 x 96 by
+ * default. Each box runs on Enter or when left; empty or "Reset" returns to
+ * the standard size.
+ */
+export function WindowSizeField({ width, height, onChange }) {
+  const [badBoxes, setBadBoxes] = useState({})
+  const onBad = useCallback((id, isBad) => setBadBoxes((b) => (b[id] === isBad ? b : { ...b, [id]: isBad })), [])
+  const bad = Object.values(badBoxes).some(Boolean)
+  const changed = width !== WINDOW_INPUT.width || height !== WINDOW_INPUT.height
+  return (
+    <Group title="Window size" hint="Width × height">
+      <div className="num-row">
+        <InchBox id="win-w" label="Window width in inches" value={width} std={WINDOW_INPUT.width}
+          onChange={(v) => onChange({ width: v })} onBad={onBad} />
+        <span className="win-x" aria-hidden="true">×</span>
+        <InchBox id="win-h" label="Window height in inches" value={height} std={WINDOW_INPUT.height}
+          onChange={(v) => onChange({ height: v })} onBad={onBad} />
+        <span className="u-unit">in</span>
+        {changed && !bad && <button type="button" className="u-reset" onClick={() => onChange({ width: WINDOW_INPUT.width, height: WINDOW_INPUT.height })}>Reset</button>}
+      </div>
+      <p id="window-help" className="num-help">
+        {bad
+          ? <span className="u-err">Enter whole inches, {WINDOW_INPUT.min} to {WINDOW_INPUT.max}</span>
+          : changed
+            ? `Standard ${WINDOW_INPUT.width} × ${WINDOW_INPUT.height} in`
+            : `Standard ${WINDOW_INPUT.width} × ${WINDOW_INPUT.height} in · type a value and press Enter`}
       </p>
     </Group>
   )

@@ -223,7 +223,10 @@ h1, h2, h3, p { margin: 0; }
 .center { min-width: 0; }
 .cavity { margin: 0; }
 .cavity svg { display: block; width: 100%; height: auto; max-width: 660px; margin: 0 auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
-.under { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 260px); justify-content: center; gap: 40px; max-width: 660px; margin: 6px auto 0; }
+.under { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 260px); justify-content: center; gap: 26px 40px; max-width: 660px; margin: 6px auto 0; }
+/* window size (v2.7): two small boxes with a times sign between them */
+.win-x { margin: 0 2px; font-size: 16px; color: var(--ink-3); }
+.num-row .u-unit { margin-left: 2px; }
 
 /* svg text and result chips */
 .cavity text { font-family: var(--font); }
@@ -255,6 +258,8 @@ h1, h2, h3, p { margin: 0; }
 .seg button:hover { color: var(--ink); background: var(--line-soft); }
 .seg button.on { background: var(--ink); color: var(--surface); font-weight: 600; }
 .seg.two { grid-template-columns: repeat(2, 1fr); }
+.seg.four { grid-template-columns: repeat(4, 1fr); }
+.seg.four button { padding: 8px 2px; font-size: 13.5px; }
 .est-note {
   margin-top: 8px; padding: 6px 10px; font-size: 12.5px; line-height: 1.4; color: #6b4a07;
   background: #fdf5e3; border-left: 3px solid #d9a21c; border-radius: 3px;
