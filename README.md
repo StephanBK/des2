@@ -54,7 +54,7 @@ npm run dev                       # hot-reload page on :5173, proxies /api to :3
 ## Test
 
 ```
-npm test        # 115 tests: validation, echo check, retries, timeouts, cache, server, links, report, wording
+npm test        # 121 tests: validation, echo check, retries, timeouts, cache, server, links, report, wording
 ```
 
 ## Deploy (Railway)

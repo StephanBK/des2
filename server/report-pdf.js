@@ -398,9 +398,13 @@ function CalendarPage({ data }) {
   const st = data.year.stats
   const ws = data.year.working_stats
   const lb = data.result.lb
+  // The card detail goes mid-sentence here, so its first letter is lowered
+  // ("(the pane stays clear)", not "(The pane stays clear)").
+  const basis = amount.detail.replace(/^Year \d+, /, '').replace(/, out of.*$/, '') || 'the reported year'
+  const basisText = basis.charAt(0).toLowerCase() + basis.slice(1)
   return h(Page, { size: 'LETTER', style: s.page },
     h(TopBar, { data, title: 'When the pane fogs' }),
-    h(SectionTitle, { lead: `Every hour of year ${data.year.number} of the simulation (${amount.detail.replace(/^Year \d+, /, '').replace(/, out of.*$/, '') || 'the reported year'}). Columns are days, rows are hours of the day, midnight at the top. Fog means a water film on the cavity side of the existing glass thick enough to see.` }, 'Hour by hour, through the year'),
+    h(SectionTitle, { lead: `Every hour of year ${data.year.number} of the simulation (${basisText}). Columns are days, rows are hours of the day, midnight at the top. Fog means a water film on the cavity side of the existing glass thick enough to see.` }, 'Hour by hour, through the year'),
     h(Heatmap, { data, width: CW }),
     h(LegendRow, { lb }),
 
@@ -490,13 +494,15 @@ function OptionsTable({ data }) {
  */
 export function methodItems(data) {
   const lb = data.config.lb
+  const facing = data.config.facade.label.toLowerCase()
+  const article = /^[aeiou]/.test(facing) ? 'an' : 'a'
   return [
     `Weather: the site's typical meteorological year from NREL's National Solar Radiation Database for the nearest grid cell, repeated each year.`,
-    `Glass temperature: every hour, the cavity side of the existing glass is set by the outdoor and room temperatures and the glass factor f of this pairing of existing and retrofit glass (from WINDOW thermal analysis)${data.config.facade.key === 'north' ? '; a north-facing window gets little direct sun' : `, plus the sun on a ${data.config.facade.label.toLowerCase()}-facing window`}.`,
+    `Glass temperature: every hour, the cavity side of the existing glass is set by the outdoor and room temperatures and the glass factor f of this pairing of existing and retrofit glass (from WINDOW thermal analysis)${data.config.facade.key === 'north' ? '; a north-facing window gets little direct sun' : `, plus the sun on ${article} ${facing}-facing window`}.`,
     `Moisture: air reaches the cavity through the existing window seal and the retrofit seal, driven by building pressurization, stack effect and wind, and water vapor diffuses through the sealant beads.${lb > 0 ? ' The desiccant takes up water until it is full.' : ''} An hourly moisture balance gives the dew point of the cavity air.`,
-    'Fog: when the glass is colder than that dew point, water condenses on it. A film thicker than about 5 µm counts as visible fog; it clears as the glass warms and the water evaporates.',
+    'Fog: when the glass is colder than that dew point, water condenses on it. A film thicker than an estimated visibility threshold of about 5 µm counts as visible fog; it clears as the glass warms and the water evaporates.',
     lb > 0
-      ? 'Run: hour by hour from installation on January 1 until the desiccant is full, plus one more year; the per-year figures come from the last simulated year.'
+      ? `Run: hour by hour from installation on January 1 until the desiccant is full, plus one more year (at most ${data.result.max_years} years); the per-year figures come from the last simulated year.`
       : 'Run: hour by hour for two years from installation on January 1. Year 1 starts from a clean pane, so the per-year figures come from year 2, the settled year.',
   ]
 }

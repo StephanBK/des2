@@ -134,6 +134,9 @@ export function summarize(r, { working = false, quiet = false } = {}) {
     const f0 = firstFogHour(r, working)
     const lead = quiet ? 'The pane' : 'Without desiccant, the pane'
     if (f0 === null) return [working ? `${lead} stays clear in working hours.` : `${lead} stays clear all year.`]
+    // Fog only in the start-up year 1 and none in the settled year: say so,
+    // rather than "fogs on about 0 days a year" (review 2026-10-17).
+    if (perYear === 0) return [`${lead} stays clear${working ? ' in working hours' : ''} in the settled year ${r.years.length}.`, `It fogs only early in the run, first on ${date(f0)}.`]
     return [`${lead} fogs on about ${days(perYear)} a year.`, `The first fog${working ? ' in working hours' : ''} comes on ${date(f0)}.`]
   }
 

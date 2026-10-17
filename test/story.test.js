@@ -288,3 +288,37 @@ test('first visible fog follows the working-hours view', async () => {
   assert.equal(firstFogHour(night, true), null)
   assert.equal(headlineCards(night, { working: true })[1].value, 'None')
 })
+
+// ---- quiet wording for the customer report (Anas 2026-10-17)
+
+test('quiet (report): with 0 lb nothing mentions desiccant, and there is no desiccant box', () => {
+  const fogging = run({ lb: 0, first_fog_hour: 40 * 24, hours_run: 2 * Y, years: [{ fog_hours: 12, fog: fogYear(960, 972) }, { fog_hours: 15, fog: fogYear(900, 915) }] })
+  for (const r of [run({ lb: 0 }), fogging]) {
+    for (const working of [false, true]) {
+      const text = JSON.stringify([summarize(r, { quiet: true, working }), headlineCards(r, { quiet: true, working })])
+      assert.doesNotMatch(text, /desiccant/i, `working=${working}`)
+      assert.deepEqual(headlineCards(r, { quiet: true, working }).map((c) => c.key), ['first', 'amount'])
+    }
+  }
+  assert.deepEqual(summarize(fogging, { quiet: true }).slice(0, 1), ['The pane fogs on about 2 days a year.'])  // hours 900 to 915 cross midnight: 2 days
+  assert.equal(headlineCards(fogging, { quiet: true })[1].detail, 'Year 2, a settled year')
+})
+
+test('quiet is report-only: without it the page wording and three boxes are unchanged', () => {
+  assert.deepEqual(summarize(run({ lb: 0 })), ['Without desiccant, the pane stays clear all year.'])
+  assert.deepEqual(headlineCards(run({ lb: 0 })).map((c) => c.key), ['life', 'first', 'amount'])
+  // with desiccant, quiet changes nothing
+  const r = run({ lb: 4 })
+  assert.deepEqual(summarize(r, { quiet: true }), summarize(r))
+  assert.deepEqual(headlineCards(r, { quiet: true }), headlineCards(r))
+})
+
+test('0 lb, fog only in year 1: says clear in the settled year, never "about 0 days a year"', () => {
+  const r = run({ lb: 0, first_fog_hour: 40 * 24, hours_run: 2 * Y, years: [{ fog_hours: 3, fog: fogYear(960, 963) }, { fog_hours: 0, fog: fogYear(0, 0) }] })
+  for (const quiet of [false, true]) {
+    const s = summarize(r, { quiet })
+    assert.doesNotMatch(s.join(' '), /about 0 days/)
+    assert.match(s[0], /stays clear in the settled year 2\.$/)
+    assert.equal(s[1], 'It fogs only early in the run, first on February 10, year 1.')
+  }
+})

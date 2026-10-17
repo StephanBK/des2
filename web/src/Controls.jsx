@@ -260,7 +260,8 @@ export function OffsetField({ value, onChange }) {
 
 /**
  * Facade orientation (v2.7, Anas 2026-10-17): which way the window faces.
- * North is the default and the cautious case (no direct sun on the glass).
+ * North is the default (little direct sun on the glass), but not always the
+ * facade that fogs most: the facade also sets the wind pressure.
  */
 export function FacadeSwitch({ value, onChange }) {
   const picked = FACADES.find((f) => f.key === value) ?? FACADES[0]

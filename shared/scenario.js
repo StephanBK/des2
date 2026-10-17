@@ -176,7 +176,7 @@ export const WORKING_HOURS = { start: 8, end: 18, days: 261, hours: 2610, label:
 
 // Plain-language list of what is fixed, for the assumptions drawer.
 export const FIXED_DESCRIPTION = [
-  ['Building', 'Window at mid-height of a 20-story building, where the stack effect is close to zero. The facade orientation is an input, north unless changed. It sets how much sun reaches the glass and which winds press on the facade; because of the wind, north is not always the facade that fogs most (live check, Long Island City, VIG: north 38, east 50, south 38, west 6 fog days a year).'],
+  ['Building', 'Window at mid-height of a 20-story building, where the stack effect is close to zero. The facade orientation is an input, north unless changed. It sets how much sun reaches the glass and which winds press on the facade; because of the wind, north is not always the facade that fogs most.'],
   ['Window', 'Width and height are inputs, 60 × 96 in unless changed. The cavity depth between the existing glass and the retrofit is an input too, 0.6 in unless changed.'],
   ['Weather', 'Typical meteorological year for the site (NREL NSRDB), repeated every year.'],
   ['Start', 'Installation on January 1 with a fresh desiccant.'],

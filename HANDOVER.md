@@ -74,7 +74,18 @@ reword the portal tile.
   the same report id.
 - Still on the report (not asked to remove): the page-1 ESTIMATE tag and
   amber note for an existing double pane when U is not typed in.
-- Tests 103 -> 115.
+- Independent review (separate agent, same day): no bugs. Fixed from it:
+  method note "an east-facing", "(at most 20 years)" for a desiccant that
+  never fills, fog threshold called an estimate; two pre-existing report
+  glitches (0 lb with fog only in year 1 said "fogs on about 0 days a year",
+  now "stays clear in the settled year 2"; page-2 lead "(The pane stays
+  clear)" now lower case). New regression tests render the PDF and search
+  its text with pdftotext (skipped where poppler is missing); proven to fail
+  when the quiet wording is switched off.
+- Pre-existing, not changed: a very long street address (h1 on 2+ lines)
+  with desiccant and an existing double pane overflows page 1 to 4 pages
+  (same in v2.6). Realistic long addresses stay at 3 pages.
+- Tests 103 -> 121.
 
 ## v2.6.0 (2026-10-16): cavity depth (offset) as an input
 
@@ -528,7 +539,9 @@ reword the portal tile.
 ## Open items
 
 - Ask Anas: should the page-1 ESTIMATE tag and note (existing double pane,
-  U not typed) go too, by the same logic as the ENTERED note?
+  U not typed) go too, by the same logic as the ENTERED note? Related: with
+  the asterisk gone, the page-3 U values of the OTHER two glasses over an
+  existing double pane are estimates with no mark (until Arnold's WINDOW U).
 - "Clear up to X %" / humidity headroom: off for now (v2.7). Anas thought
   the values looked inconsistent (SWR-IG 2 fog days at 30 % but "clear up
   to 25 %"). They were consistent by definition (highest RH in 5 % steps with

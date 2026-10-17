@@ -9,7 +9,8 @@ import { createApp } from '../server/index.js'
 import { createEngineClient } from '../server/engine.js'
 import { createSuggester } from '../server/suggest.js'
 import { cleanProject, headroomOf, monthlyFogDays, reportId, RH_LEVELS } from '../server/report-data.js'
-import { DISCLAIMER } from '../server/report-pdf.js'
+import { DISCLAIMER, methodItems } from '../server/report-pdf.js'
+import { execFileSync } from 'node:child_process'
 import { DEFAULTS, EXAMPLE_SITE } from '../shared/scenario.js'
 
 // The page's defaults have no address (v2.4); tests add a known one.
@@ -227,4 +228,46 @@ test('the report carries a liability disclaimer', () => {
   for (const phrase of ['estimates', 'may differ', 'not a warranty', 'guarantee', 'written warranty', 'accepts no liability']) {
     assert.ok(DISCLAIMER.includes(phrase), phrase)
   }
+})
+
+// ---- Anas 2026-10-17: at 0 lb the customer report never mentions desiccant
+
+// Text of a PDF via pdftotext (poppler). The PDF's text is font-encoded, so a
+// plain byte search cannot see it. Tests skip where pdftotext is missing.
+let hasPdftotext = true
+try { execFileSync('pdftotext', ['-v'], { stdio: 'ignore' }) } catch { hasPdftotext = false }
+const pdfText = (buf) => execFileSync('pdftotext', ['-layout', '-', '-'], { input: buf }).toString()
+
+test('report PDF at 0 lb: no desiccant, ENTERED, asterisk, clear-up-to or headroom anywhere; 3 pages', { skip: !hasPdftotext && 'pdftotext not installed' }, async (t) => {
+  const s = await start(t)
+  for (const extra of [{ ex: 'double', glass: 'double', u: '0.196', seal_out: 'aged', seal_in: 'certified_best' }, { ex: 'double', glass: 'vig' }, { facade: 'east', width: '30', height: '48' }]) {
+    const r = await s.get(`/api/report?${qs({ lb: 0, ...extra })}&project=Falchi`)
+    assert.equal(r.status, 200)
+    const text = pdfText(r.body)
+    assert.doesNotMatch(text, /desiccant/i, JSON.stringify(extra))
+    assert.doesNotMatch(text, /ENTERED|clear up to|headroom|typed in|Why a better/i, JSON.stringify(extra))
+    assert.doesNotMatch(text, /\d\*/, 'no estimate asterisk')
+    assert.match(text, /How this assessment works/)
+    assert.match(text, /SWR Condensation Assessment/)
+    assert.equal((r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 3)
+  }
+})
+
+test('report PDF with desiccant: the desiccant content is still there; 3 pages', { skip: !hasPdftotext && 'pdftotext not installed' }, async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report?${qs({ lb: 4, facade: 'south', width: '48', height: '120' })}&project=${encodeURIComponent('Long project name '.repeat(4).trim())}`)
+  assert.equal(r.status, 200)
+  const text = pdfText(r.body)
+  for (const phrase of [/Desiccant loading/, /Desiccant keeps/, /desiccant takes up water/, /South-facing/, /48 × 120 in/]) assert.match(text, phrase)
+  assert.equal((r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 3)
+})
+
+test('method note: no desiccant at 0 lb, right article for each facade, 20-year cap with desiccant', () => {
+  const data = (lb, facade) => ({ config: { lb, facade }, result: { max_years: 20 } })
+  assert.doesNotMatch(methodItems(data(0, { key: 'north', label: 'North' })).join(' '), /desiccant/i)
+  assert.match(methodItems(data(0, { key: 'north', label: 'North' })).join(' '), /north-facing window gets little direct sun/)
+  assert.match(methodItems(data(0, { key: 'east', label: 'East' })).join(' '), /plus the sun on an east-facing window/)
+  assert.match(methodItems(data(0, { key: 'west', label: 'West' })).join(' '), /plus the sun on a west-facing window/)
+  assert.match(methodItems(data(4, { key: 'south', label: 'South' })).join(' '), /at most 20 years/)
+  assert.match(methodItems(data(0, { key: 'north', label: 'North' })).join(' '), /estimated visibility threshold/)
 })
