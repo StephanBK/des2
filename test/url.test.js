@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parseU, queryOf, readUrlScenario } from '../web/src/api.js'
+import { parseFloor, parseU, queryOf, readUrlScenario } from '../web/src/api.js'
 import { DEFAULTS, EXAMPLE_SITE } from '../shared/scenario.js'
 
 test('U box text: lenient, rounded to 3 decimals, null outside 0.050 to 1.200', () => {
@@ -76,4 +76,37 @@ test('link: facade and window size left out at their defaults, in order after th
   const p = new URLSearchParams(queryOf(s))
   for (const k of ['facade', 'width', 'height']) assert.equal(p.has(k), false, `old links stay identical: ${k}`)
   assert.match(queryOf({ ...s, facade: 'east', width: 30, height: 72 }), /&glass=vig&facade=east&width=30&height=72&seal_out=/)
+})
+
+// v2.8: room humidity mode and building height in links
+
+test('floor box text: whole numbers 1 to the limit, null otherwise', () => {
+  assert.equal(parseFloor('11'), 11)
+  assert.equal(parseFloor(' 7 '), 7)
+  assert.equal(parseFloor('100'), 100)
+  assert.equal(parseFloor('10', 11), 10)
+  assert.equal(parseFloor('12', 11), null, 'window floor above the floors')
+  for (const bad of ['', null, '0', '101', '2.5', '-3', 'x', '1e1']) assert.equal(parseFloor(bad), null, String(bad))
+})
+
+test('link: humidity mode and building read back; invalid values fall back to a fixed RH and 20 / 10', () => {
+  const site = `&addr=${encodeURIComponent(EXAMPLE_SITE.addr)}`
+  const a = readUrlScenario(`?hum=none&floors=11&wfloor=10${site}`)
+  assert.deepEqual([a.hum, a.floors, a.wfloor], ['none', 11, 10])
+  const b = readUrlScenario(`?hum=wet&floors=0&wfloor=abc${site}`)
+  assert.deepEqual([b.hum, b.floors, b.wfloor], ['fixed', 20, 10])
+  const c = readUrlScenario(`?floors=11&wfloor=12${site}`)
+  assert.deepEqual([c.floors, c.wfloor], [20, 10], 'a window floor above the floors falls back to the standard pair')
+  const old = readUrlScenario(`?ex=single&glass=vig${site}`)
+  assert.deepEqual([old.hum, old.floors, old.wfloor], ['fixed', 20, 10], 'a pre-v2.8 link opens as before')
+})
+
+test('link: humidity mode and building left out at their defaults, in their places when set', () => {
+  const s = { ...DEFAULTS, ...EXAMPLE_SITE }
+  const p = new URLSearchParams(queryOf(s))
+  for (const k of ['hum', 'floors', 'wfloor']) assert.equal(p.has(k), false, `old links stay identical: ${k}`)
+  const q = queryOf({ ...s, hum: 'none', floors: 11, wfloor: 10 })
+  assert.match(q, /&floors=11&seal_out=/, 'floors after the window size; wfloor 10 is the standard and left out')
+  assert.match(q, /&rh=30&hum=none&addr=/)
+  assert.match(queryOf({ ...s, floors: 11, wfloor: 3 }), /&floors=11&wfloor=3&seal_out=/)
 })

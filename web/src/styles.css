@@ -462,3 +462,9 @@ input[type='range']::-moz-range-thumb { width: 12px; height: 12px; border-radius
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* v2.8: room humidity toggle; the RH slider is greyed when the room is not humidified */
+.hum-seg { margin: 14px 0 12px; }
+.hum-seg button { font-size: 13.5px; padding: 8px 4px; }
+.slider.off { opacity: 0.42; }
+.slider.off input { cursor: not-allowed; }

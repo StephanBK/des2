@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '2.7.0'
+export const APP_VERSION = '2.8.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full).
@@ -95,6 +95,37 @@ export const FACADES = [
 ]
 export const WINDOW_INPUT = { min: 12, max: 240, width: 60, height: 96 }
 
+// v2.8 (Stephan 2026-10-19, after 2000 Colorado Avenue, Boulder showed no fog
+// where a report at a fixed 20 % RH predicted it): the room air can be a
+// fixed RH (as before, the default) or a building without humidification,
+// where the engine (room_humidity=unhumidified) uses the outdoor air's
+// moisture plus what the occupants add. Office occupants, from the sources:
+//   36 to 44 W latent per seated office worker = 36 x 3600 / 2450 = 53 to 65 g/h
+//   ASHRAE 62.1 office air 17 cfm/person = 28.9 m3/h x 1.20 kg/m3 = 34.7 kg/h
+//   53 to 65 / 34.7 = 1.5 to 1.9 g/kg at full design occupancy; 1.2 at about 70 %
+// fading after hours at 0.5 air changes per hour. Both ESTIMATES. Over 8
+// cities x 3 assemblies this mode gave 18 % fewer fog days than a fixed 30 %
+// in total, but MORE in humid winters (Seattle): it is the right room air
+// for an unhumidified building, not a "less fog" switch.
+export const HUMIDITY = [
+  { key: 'fixed', label: 'Fixed RH', engine: 'fixed', tip: 'The room is held at the relative humidity set below, every hour of the year (a humidified building, or a cautious assumption).' },
+  { key: 'none', label: 'No humidification', engine: 'unhumidified', tip: 'No humidifier: the room air carries the outdoor air\'s moisture plus what the occupants add (office). Drier than a fixed RH in cold, dry climates; can be wetter in humid winters.' },
+]
+export const PEOPLE = { gkg: 1.2, fade_ach: 0.5 }
+
+// v2.8: building height and the window's floor are inputs (fixed at 20 / 10
+// since v2.0: mid-height, stack effect near zero). Floor height stays the
+// engine's 3.6 m (11.8 ft). In a heated building the room air pushes OUT
+// through windows above mid-height (and outdoor air comes in below it), so
+// a window near the top of a short building fogs more: at 2000 Colorado Ave
+// (11 floors, floor 10) the same report inputs give 53 fog days, not 7.
+export const BUILDING_INPUT = { min: 1, max: 100, floors: 20, wfloor: 10, floor_height_ft: 11.81 }
+
+/** Height of the window above the building's neutral plane (mid-height), in feet; negative below it. */
+export function heightAboveMidFt(floors, wfloor) {
+  return (wfloor - 0.5 - floors / 2) * BUILDING_INPUT.floor_height_ft
+}
+
 /** A typed U that equals the table value is no override: null, so links and caches stay clean. */
 export function normalizeU(existing, glass, u) {
   if (u === null || u === undefined) return null
@@ -147,22 +178,26 @@ export const SITE_TOL_DEG = 0.02            // about 2 km, the size of one weath
 // A known address for tests and examples only; never pre-filled on the page.
 export const EXAMPLE_SITE = { addr: '350 Fifth Avenue, New York, New York 10118, United States', lat: 40.74844, lon: -73.98566 }
 
-export const DEFAULTS = { ex: 'single', glass: 'vig', u: null, offset: OFFSET_INPUT.default, facade: 'north', width: WINDOW_INPUT.width, height: WINDOW_INPUT.height, seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, addr: '', lat: null, lon: null }
+export const DEFAULTS = { ex: 'single', glass: 'vig', u: null, offset: OFFSET_INPUT.default, facade: 'north', width: WINDOW_INPUT.width, height: WINDOW_INPUT.height, floors: BUILDING_INPUT.floors, wfloor: BUILDING_INPUT.wfloor, seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, hum: 'fixed', addr: '', lat: null, lon: null }
 
 // Every hidden engine input is pinned explicitly (not left to engine
 // defaults), so an engine default change cannot move these results, and
 // every one of them is checked against the engine's echo.
-// orientation, width_in, height_in (v2.7) and offset_in (v2.6) come from the
-// scenario, not from here.
+// orientation, width_in, height_in (v2.7), offset_in (v2.6), floors,
+// window_floor and room_humidity (v2.8) come from the scenario, not from here.
 export const FIXED = {
   r_ip: 0.97,                 // f_cold and u_ip come from THERMAL, not fixed
   desiccant: 'ms3a',
   desorption: true,
   absorptance: 0.1,
-  floors: 20, window_floor: 10,
   p_occ_pa: 5, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
   sealant_out: 'silicone', sealant_in: 'silicone',
   max_years: 20,
+  // v2.8: the full theoretical stack pressure (as before), and the office
+  // occupants for "No humidification" (sent always; the engine ignores them
+  // for a fixed RH).
+  stack_factor: 1.0,
+  people_gkg: PEOPLE.gkg, people_fade_ach: PEOPLE.fade_ach,
 }
 
 // Whole years simulated after the desiccant fills, so the first winter
@@ -176,13 +211,14 @@ export const WORKING_HOURS = { start: 8, end: 18, days: 261, hours: 2610, label:
 
 // Plain-language list of what is fixed, for the assumptions drawer.
 export const FIXED_DESCRIPTION = [
-  ['Building', 'Window at mid-height of a 20-story building, where the stack effect is close to zero. The facade orientation is an input, north unless changed. It sets how much sun reaches the glass and which winds press on the facade; because of the wind, north is not always the facade that fogs most.'],
+  ['Building', 'Building height and the window\'s floor are inputs, 20 floors and floor 10 unless changed: mid-height, where the stack effect is close to zero. In winter the warm room air pushes out through windows above mid-height, so a window near the top of a building fogs more. Floors are 11.8 ft. The facade orientation is an input, north unless changed. It sets how much sun reaches the glass and which winds press on the facade; because of the wind, north is not always the facade that fogs most.'],
   ['Window', 'Width and height are inputs, 60 × 96 in unless changed. The cavity depth between the existing glass and the retrofit is an input too, 0.6 in unless changed.'],
   ['Weather', 'Typical meteorological year for the site (NREL NSRDB), repeated every year.'],
   ['Start', 'Installation on January 1 with a fresh desiccant.'],
   ['Desiccant', '3A molecular sieve. It can release water again when warm (desorption on).'],
   ['Sealant', 'Silicone beads on both layers; water vapor slowly diffuses through them.'],
   ['Building pressure', '+5 Pa on weekdays 7 am to 7 pm, 0 Pa otherwise, plus stack and wind.'],
+  ['Room air', 'Fixed RH: the set relative humidity every hour. No humidification: the outdoor air\'s moisture plus the occupants\' (office: 1.2 g of water per kg of air while occupied, weekdays 7 am to 7 pm, fading after hours), at most 60 % RH when it is warm outdoors.'],
 ]
 
 export const ASSUMPTIONS = [
@@ -194,4 +230,5 @@ export const ASSUMPTIONS = [
   'The cavity depth changes only the cavity air volume in the simulation. The glass factor f, the U-value and the air-gap resistance are the values for a 0.6 in cavity, so a deeper or shallower cavity does not yet change the glass temperatures. Because air leaks in per square foot of window, not per cubic foot of cavity, depth alone has a small effect on fog.',
   '"Desiccant full" means 95 % of its capacity at 25 °C.',
   'The same typical weather year repeats; no climate trend or unusual years.',
+  '"No humidification" adds 1.2 g of water per kg of room air while the office is occupied: 36 to 44 W of latent heat per seated worker (53 to 65 g of water an hour) into the ASHRAE 62.1 office ventilation of 17 cfm per person gives 1.5 to 1.9 g/kg at full occupancy; 1.2 is about 70 %. After hours it fades at 0.5 air changes per hour. Both are estimates; a building that ventilates more, or holds fewer people, is drier.',
 ]

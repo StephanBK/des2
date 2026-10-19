@@ -214,7 +214,7 @@ function SummaryPage({ data }) {
     rest ? h(Text, { style: s.h1sub }, rest) : null,
     h(Text, { style: { fontSize: 9.5, color: C.ink2, marginTop: 8 } },
       // \u00a0 (no-break space) keeps each number on the same line as its unit.
-      `Secondary window retrofit: existing ${inSentence(cfg.existing.label)} with an INOVUES ${cfg.glass.product} (${inSentence(cfg.glass.label)}) retrofit, ${cfg.lb ? `${cfg.lb}\u00a0lb of desiccant, ` : ''}room at ${cfg.t}\u00a0°F and ${cfg.rh}\u00a0% RH.`),
+      `Secondary window retrofit: existing ${inSentence(cfg.existing.label)} with an INOVUES ${cfg.glass.product} (${inSentence(cfg.glass.label)}) retrofit, ${cfg.lb ? `${cfg.lb}\u00a0lb of desiccant, ` : ''}room at ${cfg.t}\u00a0°F ${cfg.hum?.key === 'none' ? 'without humidification' : `and ${cfg.rh}\u00a0% RH`}.`),
 
     h(View, { style: { marginTop: 13, backgroundColor: tone.bg, borderLeftWidth: 4, borderLeftColor: tone.bd, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 2 } },
       h(Text, { style: { fontSize: 7.5, fontWeight: 600, letterSpacing: 1.2, color: tone.ink } }, 'OUTLOOK FOR A TYPICAL YEAR'),
@@ -232,7 +232,7 @@ function SummaryPage({ data }) {
         h(KV, { k: 'Weather data', v: 'NREL NSRDB typical year' }),
         h(KV, { k: 'Weather cell', v: cellText(data.site.weather_cell) }),
         h(KV, { k: 'Facade', v: `${cfg.facade.label}-facing` }),
-        h(KV, { k: 'Window', v: `${cfg.window.width} × ${cfg.window.height} in, at mid-height` })),
+        h(KV, { k: 'Window', v: `${cfg.window.width} × ${cfg.window.height} in, ${cfg.building?.changed ? `floor ${cfg.building.wfloor} of ${cfg.building.floors}` : 'at mid-height'}` })),
       h(View, { style: { flex: 1 } },
         h(Text, { style: s.h3 }, 'Window assembly'),
         h(KV, { k: 'Existing glass', v: cfg.existing.label }),
@@ -243,7 +243,7 @@ function SummaryPage({ data }) {
         h(KV, { k: 'Existing seal', v: seal(cfg.seal_out) }),
         h(KV, { k: 'Retrofit seal', v: seal(cfg.seal_in) }),
         cfg.lb ? h(KV, { k: 'Desiccant', v: `${cfg.lb} lb (${cfg.grams.toLocaleString('en-US')} g) 3A molecular sieve` }) : null,
-        h(KV, { k: 'Room air', v: `${cfg.t} °F, ${cfg.rh} % RH, dew point ${fmt0(cfg.dew_f)} °F` }))),
+        h(KV, { k: 'Room air', v: roomAirText(cfg) }))),
 
     h(Glance, { data }),
     est ? h(View, { style: { marginTop: 9, backgroundColor: C.amberSoft, borderLeftWidth: 3, borderLeftColor: C.amber, paddingVertical: 4, paddingHorizontal: 8 } },
@@ -443,7 +443,9 @@ function CalendarPage({ data }) {
           lb > 0
             ? 'While the desiccant works, it keeps the cavity air dry. Once it is full, the cavity follows the outdoor and room air that leaks in through the seals, and the yearly pattern above repeats.'
             : 'The cavity air follows the outdoor and room air that leaks in through the seals. Year 1 starts from a clean pane and dry cavity air, so the settled year 2 is reported.',
-          'Room humidity matters most: more moisture in the room air raises the dew point of the air that reaches the cavity, so fog days rise quickly with room RH.',
+          data.config.hum?.key === 'none'
+            ? 'Room humidity matters most. This building has no humidifier, so the room air carries the outdoor moisture plus what the occupants add: humid winter spells raise the dew point of the air that reaches the cavity, dry cold spells lower it.'
+            : 'Room humidity matters most: more moisture in the room air raises the dew point of the air that reaches the cavity, so fog days rise quickly with room RH.',
         ],
       })),
     h(Footer, { data }))
@@ -492,6 +494,15 @@ function OptionsTable({ data }) {
  * the reasoning behind it, before the disclaimer. Without desiccant it says
  * nothing about desiccant.
  */
+/** Room air row on page 1: the set RH and its dew point, or (no humidification) the simulated heating-season RH. */
+export function roomAirText(cfg) {
+  if (cfg.hum?.key !== 'none') return `${cfg.t} °F, ${cfg.rh} % RH, dew point ${fmt0(cfg.dew_f)} °F`
+  const r = cfg.room
+  return r && r.median_pct != null
+    ? `${cfg.t} °F, no humidification; heating season about ${Math.round(r.median_pct)} % RH (${Math.round(r.p10_pct)} to ${Math.round(r.p90_pct)} %)`
+    : `${cfg.t} °F, no humidification (outdoor moisture plus occupants)`
+}
+
 export function methodItems(data) {
   const lb = data.config.lb
   const facing = data.config.facade.label.toLowerCase()
@@ -500,6 +511,9 @@ export function methodItems(data) {
     `Weather: the site's typical meteorological year from NREL's National Solar Radiation Database for the nearest grid cell, repeated each year.`,
     `Glass temperature: every hour, the cavity side of the existing glass is set by the outdoor and room temperatures and the glass factor f of this pairing of existing and retrofit glass (from WINDOW thermal analysis)${data.config.facade.key === 'north' ? '; a north-facing window gets little direct sun' : `, plus the sun on ${article} ${facing}-facing window`}.`,
     `Moisture: air reaches the cavity through the existing window seal and the retrofit seal, driven by building pressurization, stack effect and wind, and water vapor diffuses through the sealant beads.${lb > 0 ? ' The desiccant takes up water until it is full.' : ''} An hourly moisture balance gives the dew point of the cavity air.`,
+    ...(data.config.hum?.key === 'none'
+      ? [`Room air: the building has no humidifier, so every hour the room air carries the outdoor air's moisture plus what office occupants add (about ${data.config.people_gkg} g of water per kg of air while occupied, fading after hours).`]
+      : []),
     'Fog: when the glass is colder than that dew point, water condenses on it. A film thicker than an estimated visibility threshold of about 5 µm counts as visible fog; it clears as the glass warms and the water evaporates.',
     lb > 0
       ? `Run: hour by hour from installation on January 1 until the desiccant is full, plus one more year (at most ${data.result.max_years} years); the per-year figures come from the last simulated year.`

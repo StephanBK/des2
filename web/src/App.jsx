@@ -6,7 +6,7 @@ import ReportDialog from './ReportDialog.jsx'
 import { fetchConfig, peek, queryOf, readUrlHours, readUrlScenario, runScenario, writeUrlScenario } from './api.js'
 import Assumptions from './Assumptions.jsx'
 import Cavity from './Cavity.jsx'
-import { AssemblyBar, DesiccantSlider, dewPointF, FacadeSwitch, OffsetField, RoomSliders, SealLadder, WindowSizeField } from './Controls.jsx'
+import { AssemblyBar, BuildingField, DesiccantSlider, dewPointF, FacadeSwitch, OffsetField, RoomSliders, SealLadder, WindowSizeField } from './Controls.jsx'
 import FogCalendar, { Legend } from './FogCalendar.jsx'
 
 function ErrorPanel({ error, onRetry }) {
@@ -95,6 +95,8 @@ export default function App() {
     in: SEALS_RETROFIT.findIndex((s) => s.key === scenario.seal_in),
   }
   const glassLabel = GLASSES.find((g) => g.key === scenario.glass).label
+  // The simulated room RH belongs to the run on screen; none while a run in the other humidity mode is shown.
+  const roomNow = r && data?.scenario?.hum === scenario.hum ? r.room : null
   const dim = busy && data ? ' busy' : ''
 
   return (
@@ -158,7 +160,7 @@ export default function App() {
           </div>
 
           <div className="center">
-            <Cavity scenario={scenario} sealRanks={ranks} result={r} busy={busy} glassLabel={glassLabel} working={workingView}
+            <Cavity scenario={scenario} sealRanks={ranks} result={r} room={roomNow} busy={busy} glassLabel={glassLabel} working={workingView}
               place={placeName(data?.engine?.site || scenario.addr)}
               dewF={dewPointF(scenario.t, scenario.rh)} />
             <div className="under">
@@ -166,14 +168,16 @@ export default function App() {
               <OffsetField value={scenario.offset} onChange={(v) => update({ offset: v })} />
               <WindowSizeField width={scenario.width} height={scenario.height} onChange={(patch) => update(patch)} />
               <FacadeSwitch value={scenario.facade} onChange={(k) => update({ facade: k })} />
+              <BuildingField floors={scenario.floors} wfloor={scenario.wfloor} onChange={(patch) => update(patch)} />
             </div>
           </div>
 
           <div className="side room-side">
             <SealLadder title="Retrofit seal" items={SEALS_RETROFIT} value={scenario.seal_in}
               engineValues={config?.seals_retrofit} onPick={(k) => update({ seal_in: k })} />
-            <RoomSliders t={scenario.t} rh={scenario.rh}
-              onT={(v) => update({ t: v }, 'slider')} onRh={(v) => update({ rh: v }, 'slider')} />
+            <RoomSliders t={scenario.t} rh={scenario.rh} hum={scenario.hum} room={roomNow}
+              onT={(v) => update({ t: v }, 'slider')} onRh={(v) => update({ rh: v }, 'slider')}
+              onHum={(k) => update({ hum: k })} />
           </div>
         </section>
 

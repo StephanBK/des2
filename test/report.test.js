@@ -271,3 +271,54 @@ test('method note: no desiccant at 0 lb, right article for each facade, 20-year 
   assert.match(methodItems(data(4, { key: 'south', label: 'South' })).join(' '), /at most 20 years/)
   assert.match(methodItems(data(0, { key: 'north', label: 'North' })).join(' '), /estimated visibility threshold/)
 })
+
+// ------------------------------------------------------------ v2.8: room humidity and building
+
+test('report with no humidification and a real building height: every glass uses them, the report and link carry them', async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report.json?${qs({ hum: 'none', floors: '11', wfloor: '10' })}`)
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.equal(r.json.config.hum.key, 'none')
+  assert.deepEqual(r.json.config.building, { floors: 11, wfloor: 10, changed: true, above_mid_ft: 47 })
+  assert.deepEqual(r.json.config.room, { median_pct: 18.0, p10_pct: 10.0, p90_pct: 31.0 })
+  const runs = s.f.calls.urls.filter((u) => u.pathname === '/api/lifetime')
+  assert.equal(runs.length, 3)
+  assert.ok(runs.every((u) => u.searchParams.get('room_humidity') === 'unhumidified' && u.searchParams.get('floors') === '11' && u.searchParams.get('window_floor') === '10'))
+  const link = new URL(r.json.link).searchParams
+  assert.deepEqual([link.get('hum'), link.get('floors'), link.has('wfloor')], ['none', '11', false], 'floor 10 is the standard window floor')
+  const std = await s.get(`/api/report.json?${qs()}`)
+  assert.equal(std.json.config.hum.key, 'fixed')
+  assert.deepEqual(std.json.config.building, { floors: 20, wfloor: 10, changed: false, above_mid_ft: -6 })
+  for (const k of ['hum', 'floors', 'wfloor']) assert.equal(new URL(std.json.link).searchParams.has(k), false, k)
+})
+
+test('report PDF without humidification: says so on every page that mentions room air, shows the floor; 3 pages', { skip: !hasPdftotext && 'pdftotext not installed' }, async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report?${qs({ lb: 0, hum: 'none', floors: '11', wfloor: '10', width: '30', height: '14', seal_out: 'aged', seal_in: 'certified_best' })}&project=CU%20Gamow%20Tower`)
+  assert.equal(r.status, 200)
+  const text = pdfText(r.body).replace(/\s+/g, ' ')
+  assert.match(text, /room at 70 °F without humidification/)
+  assert.match(text, /no humidification; heating season about 18 % RH \(10 to 31 %\)/)
+  assert.match(text, /30 × 14 in, floor 10 of 11/)
+  assert.match(text, /Room air: the building has no humidifier/)
+  assert.match(text, /This building has no humidifier/)
+  assert.doesNotMatch(text, /dew point \d+ °F/, 'no fixed-RH dew point')
+  assert.doesNotMatch(text, /desiccant/i)
+  assert.equal((r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 3)
+})
+
+test('report PDF at the defaults: wording unchanged (fixed RH with its dew point, window at mid-height, no humidifier text)', { skip: !hasPdftotext && 'pdftotext not installed' }, async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report?${qs({ lb: 0 })}`)
+  const text = pdfText(r.body).replace(/\s+/g, ' ')
+  assert.match(text, /room at 70 °F and 30 % RH/)
+  assert.match(text, /70 °F, 30 % RH, dew point \d+ °F/)
+  assert.match(text, /60 × 96 in, at mid-height/)
+  assert.doesNotMatch(text, /humidifier|humidification/i)
+})
+
+test('method note: a room-air line only without humidification', () => {
+  const data = (hum) => ({ config: { lb: 0, facade: { key: 'north', label: 'North' }, hum: { key: hum }, people_gkg: 1.2 }, result: { max_years: 20 } })
+  assert.doesNotMatch(methodItems(data('fixed')).join(' '), /humidifier/)
+  assert.match(methodItems(data('none')).join(' '), /Room air: the building has no humidifier.*about 1\.2 g of water per kg/)
+})

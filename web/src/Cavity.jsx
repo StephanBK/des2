@@ -105,8 +105,12 @@ export function dryChip(r) {
   return `Dry for ${formatDays(r.full_hour)}`
 }
 
-export default function Cavity({ scenario, sealRanks, result, busy, dewF, glassLabel, working = false, place = '' }) {
+export default function Cavity({ scenario, sealRanks, result, room = null, busy, dewF, glassLabel, working = false, place = '' }) {
   const build = BUILD[scenario.glass]
+  // v2.8: without a humidifier the room RH is not the slider's; show the
+  // heating-season median the engine simulated (once a run is on screen).
+  const noHum = scenario.hum === 'none'
+  const roomRh = noHum ? (room?.median_pct ?? null) : null
   const offset = scenario.offset ?? OFFSET_INPUT.default
   const grow = gapPx(offset) - GAP_AT_STD
   const paneX = PANE_X - LEFT_SHARE * grow          // existing pane moves out a little,
@@ -135,7 +139,7 @@ export default function Cavity({ scenario, sealRanks, result, busy, dewF, glassL
   return (
     <figure className="cavity">
       <svg viewBox={`0 0 ${W} ${H}`} role="img"
-        aria-label={`Section through the window: existing ${igu ? 'double-pane unit' : 'single pane'}, ${offset} inch cavity with ${lb} lb of desiccant, ${glassLabel} retrofit, room at ${scenario.t} °F and ${scenario.rh} % relative humidity.`}>
+        aria-label={`Section through the window: existing ${igu ? 'double-pane unit' : 'single pane'}, ${offset} inch cavity with ${lb} lb of desiccant, ${glassLabel} retrofit, room at ${scenario.t} °F and ${noHum ? 'no humidification' : `${scenario.rh} % relative humidity`}.`}>
         <defs>
           <pattern id="beads" width="7" height="7" patternUnits="userSpaceOnUse">
             <circle cx="3.5" cy="3.5" r="2.3" fill="var(--teal)" opacity="0.85" />
@@ -162,8 +166,17 @@ export default function Cavity({ scenario, sealRanks, result, busy, dewF, glassL
         <Dimension x1={cavL} x2={cavR} y={24} />
         <text className="zone" x={W - 20} y="24" textAnchor="end">Room</text>
         <text className="room-t" x={W - 20} y="190" textAnchor="end">{scenario.t} °F</text>
-        <text className="room-rh" x={W - 20} y="218" textAnchor="end">{scenario.rh} % RH</text>
-        <text className="zone-sub" x={W - 20} y="240" textAnchor="end">Dew point {Math.round(dewF)} °F</text>
+        {noHum ? (
+          <>
+            <text className="room-rh" x={W - 20} y="218" textAnchor="end">{roomRh != null ? `~${Math.round(roomRh)} % RH` : 'No humidifier'}</text>
+            <text className="zone-sub" x={W - 20} y="240" textAnchor="end">{roomRh != null ? 'Winter median, no humidifier' : 'Outdoor moisture + people'}</text>
+          </>
+        ) : (
+          <>
+            <text className="room-rh" x={W - 20} y="218" textAnchor="end">{scenario.rh} % RH</text>
+            <text className="zone-sub" x={W - 20} y="240" textAnchor="end">Dew point {Math.round(dewF)} °F</text>
+          </>
+        )}
 
         {/* frame */}
         <rect x={frameL} y={HEAD[0]} width={frameR - frameL} height={HEAD[1] - HEAD[0]} fill="var(--frame)" rx="2" />

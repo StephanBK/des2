@@ -1,7 +1,7 @@
 // SWR Condensation Assessment (des2, formerly "Cavity fog outlook"): web server.
 //
 // Serves the built page from dist/ and these API routes:
-//   GET /api/run?ex=&glass=[&u=][&offset=][&facade=][&width=][&height=]&seal_out=&seal_in=&lb=&t=&rh=&addr=[&lat=&lon=]   one simulation
+//   GET /api/run?ex=&glass=[&u=][&offset=][&facade=][&width=][&height=][&floors=][&wfloor=]&seal_out=&seal_in=&lb=&t=&rh=[&hum=fixed|none]&addr=[&lat=&lon=]   one simulation
 //   GET /api/suggest?q=                                 address suggestions (Mapbox)
 //   GET /api/report?<run params>[&project=]             customer report, PDF
 //   GET /api/report.json?<run params>[&project=]        the same report's data

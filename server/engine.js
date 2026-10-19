@@ -10,7 +10,7 @@
 //   5. An engine without the fog-map API is reported as out of date.
 
 import {
-  ADDRESS, EXISTING, FACADES, FIXED, GLASSES, GRAMS_PER_LB, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, U_INPUT, WINDOW_INPUT, YEARS_AFTER_FULL,
+  ADDRESS, BUILDING_INPUT, EXISTING, FACADES, FIXED, GLASSES, GRAMS_PER_LB, HUMIDITY, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, U_INPUT, WINDOW_INPUT, YEARS_AFTER_FULL,
 } from '../shared/scenario.js'
 
 export class HttpError extends Error {
@@ -21,11 +21,15 @@ export class HttpError extends Error {
   }
 }
 
-export const CONTROLS = ['ex', 'glass', 'u', 'offset', 'facade', 'width', 'height', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'addr', 'lat', 'lon']
+export const CONTROLS = ['ex', 'glass', 'u', 'offset', 'facade', 'width', 'height', 'floors', 'wfloor', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'hum', 'addr', 'lat', 'lon']
 // Optional controls and the value they take when absent; a scenario at that
 // value keeps its pre-v2.5 cache key and report id (facade, width and height
-// since v2.7: north, 60 x 96 in, the values that were fixed before).
-const OPTIONAL = { u: null, offset: OFFSET_INPUT.default, facade: 'north', width: WINDOW_INPUT.width, height: WINDOW_INPUT.height }
+// since v2.7: north, 60 x 96 in, the values that were fixed before; floors,
+// window floor and room humidity since v2.8: 20, 10 and a fixed RH).
+const OPTIONAL = {
+  u: null, offset: OFFSET_INPUT.default, facade: 'north', width: WINDOW_INPUT.width, height: WINDOW_INPUT.height,
+  floors: BUILDING_INPUT.floors, wfloor: BUILDING_INPUT.wfloor, hum: 'fixed',
+}
 
 /** True when an optional control is absent or at its default (left out of keys and links). */
 export function atDefault(k, v) {
@@ -91,6 +95,22 @@ function windowSide(name, raw, fallback) {
   return intInRange(name, raw, { min: WINDOW_INPUT.min, max: WINDOW_INPUT.max, step: 1 })
 }
 
+/** Building floors and the window's floor (v2.8): optional (20 and 10); the window floor at most the floors. */
+function building(params) {
+  const get = (k) => params.get(k)
+  const empty = (x) => x === null || x === undefined || x === ''
+  const floors = empty(get('floors')) ? OPTIONAL.floors : intInRange('floors', get('floors'), { min: BUILDING_INPUT.min, max: BUILDING_INPUT.max, step: 1 })
+  const wfloor = empty(get('wfloor')) ? OPTIONAL.wfloor : intInRange('wfloor', get('wfloor'), { min: BUILDING_INPUT.min, max: BUILDING_INPUT.max, step: 1 })
+  if (wfloor > floors) throw new HttpError(400, `wfloor (the window's floor) must be at most floors (${floors}), got ${wfloor}`)
+  return { floors, wfloor }
+}
+
+/** Room humidity mode (v2.8): optional; absent or empty = a fixed RH. */
+function humValue(raw) {
+  if (raw === null || raw === undefined || raw === '') return OPTIONAL.hum
+  return oneOf('hum', raw, HUMIDITY)
+}
+
 function coord(name, raw, limit) {
   if (!/^-?\d{1,3}(\.\d{1,12})?$/.test(raw)) throw new HttpError(400, `${name} must be a number in degrees, got "${raw}"`)
   const v = Number(raw)
@@ -123,11 +143,13 @@ export function parseScenario(params) {
     facade: facadeValue(params.get('facade')),
     width: windowSide('width', params.get('width'), WINDOW_INPUT.width),
     height: windowSide('height', params.get('height'), WINDOW_INPUT.height),
+    ...building(params),
     seal_out: oneOf('seal_out', params.get('seal_out'), SEALS_EXISTING),
     seal_in: oneOf('seal_in', params.get('seal_in'), SEALS_RETROFIT),
     lb: intInRange('lb', params.get('lb'), RANGES.lb),
     t: intInRange('t', params.get('t'), RANGES.t),
     rh: intInRange('rh', params.get('rh'), RANGES.rh),
+    hum: humValue(params.get('hum')),
     addr: cleanAddress(params.get('addr')),
     ...site(params),
   }
@@ -153,6 +175,9 @@ export function engineParams(s) {
     width_in: s.width ?? WINDOW_INPUT.width,
     height_in: s.height ?? WINDOW_INPUT.height,
     offset_in: s.offset ?? OFFSET_INPUT.default,
+    floors: s.floors ?? OPTIONAL.floors,
+    window_floor: s.wfloor ?? OPTIONAL.wfloor,
+    room_humidity: HUMIDITY.find((x) => x.key === (s.hum ?? OPTIONAL.hum)).engine,
     // Without desiccant nothing ever fills, so the engine would play all
     // max_years years. Two are enough: year 1 starts from a clean pane and
     // fresh cavity air (a start-up year, less fog); year 2 is the settled
@@ -190,6 +215,8 @@ const ECHO = {
   occ_end_h: 'occ_end_h', weekdays_only: 'weekdays_only',
   sealant_out: 'sealant_out', sealant_in: 'sealant_in', max_years: 'max_years',
   al_out: 'al_out', al_in: 'al_in',
+  room_humidity: 'room_humidity', people_gkg: 'people_gkg', people_fade_ach: 'people_fade_ach',
+  stack_factor: 'stack_factor',
 }
 // Checked elsewhere: trace (response shape), fog_map and years_after_full
 // (payload.fog).
@@ -285,6 +312,8 @@ export function trimPayload(payload, scenario, sent) {
         visible_um: payload.fog.visible_um, max_um: payload.fog.max_um,
         levels: payload.fog.levels, scale: payload.fog.scale,
       },
+      // v2.8: room RH as simulated, heating season (median, 10th, 90th %).
+      room: payload.room?.heating_season ?? null,
     },
     engine: {
       version: payload.version,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { EXISTING, FACADES, GLASSES, glassTip, normalizeU, OFFSET_INPUT, RANGES, thermalOf, U_INPUT, WINDOW_INPUT } from '../../shared/scenario.js'
-import { parseOffset, parseU, parseWindowSide } from './api.js'
+import { BUILDING_INPUT, EXISTING, FACADES, GLASSES, glassTip, heightAboveMidFt, HUMIDITY, normalizeU, OFFSET_INPUT, PEOPLE, RANGES, thermalOf, U_INPUT, WINDOW_INPUT } from '../../shared/scenario.js'
+import { parseFloor, parseOffset, parseU, parseWindowSide } from './api.js'
 
 // Leak bar length on a log scale: the ladders span 0.005 to 2.0 cfm/ft2,
 // a factor of 400, so a linear bar would show everything but the last rung
@@ -64,14 +64,14 @@ export function SealLadder({ title, items, value, onPick, engineValues }) {
   )
 }
 
-function Slider({ id, label, value, unit, range, onChange, ticks }) {
+function Slider({ id, label, value, unit, range, onChange, ticks, disabled = false }) {
   return (
-    <div className="slider">
+    <div className={`slider${disabled ? ' off' : ''}`}>
       <label htmlFor={id} className="slider-top">
         <span>{label}</span>
         <output htmlFor={id} className="slider-val">{value}{unit}</output>
       </label>
-      <input id={id} type="range" min={range.min} max={range.max} step={range.step} value={value}
+      <input id={id} type="range" min={range.min} max={range.max} step={range.step} value={value} disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
         style={{ '--pos': `${((value - range.min) / (range.max - range.min)) * 100}%` }} />
       {ticks && (
@@ -356,11 +356,99 @@ export function DesiccantSlider({ value, onChange }) {
   )
 }
 
-export function RoomSliders({ t, rh, onT, onRh }) {
+/**
+ * Room air (v2.8): temperature, then how the humidity is set. "Fixed RH" holds
+ * the slider's value every hour (as before). "No humidification": the room
+ * carries the outdoor moisture plus the occupants' (office), so the slider is
+ * greyed and the line under it says what the room's RH actually was over the
+ * heating season (from the engine, once a run is on screen).
+ */
+export function RoomSliders({ t, rh, hum, room, onT, onRh, onHum }) {
+  const none = hum === 'none'
   return (
     <Group title="Room air">
       <Slider id="t" label="Temperature" value={t} unit=" °F" range={RANGES.t} onChange={onT} />
-      <Slider id="rh" label="Relative humidity" value={rh} unit=" %" range={RANGES.rh} onChange={onRh} />
+      <div className="seg two hum-seg" role="radiogroup" aria-label="Room humidity">
+        {HUMIDITY.map((m) => (
+          <button key={m.key} type="button" role="radio" aria-checked={hum === m.key} title={m.tip}
+            className={hum === m.key ? 'on' : ''} onClick={() => onHum(m.key)}>{m.label}</button>
+        ))}
+      </div>
+      <Slider id="rh" label="Relative humidity" value={rh} unit=" %" range={RANGES.rh} onChange={onRh} disabled={none} />
+      <p className="num-help" aria-live="polite">
+        {none
+          ? <>Follows the outdoor air plus moisture from people (office, {PEOPLE.gkg} g/kg while occupied).{room?.median_pct != null ? ` Heating season here: about ${Math.round(room.median_pct)} % (${Math.round(room.p10_pct)} to ${Math.round(room.p90_pct)} %).` : ''}</>
+          : 'Held at this value every hour of the year.'}
+      </p>
+    </Group>
+  )
+}
+
+/** One whole-number floor box; same behaviour as the window size boxes. */
+function FloorBox({ id, label, value, std, max, onChange, onBad }) {
+  const [text, setText] = useState(String(value))
+  const [bad, setBad] = useState(false)
+  const box = useRef(null)
+  const escaped = useRef(false)
+  useEffect(() => { setText(String(value)); setBad(false) }, [value])
+  useEffect(() => { onBad(id, bad) }, [id, bad, onBad])
+
+  const commit = () => {
+    if (escaped.current) { escaped.current = false; return }
+    if (text.trim() === '') { setBad(false); setText(String(Math.min(std, max))); if (value !== Math.min(std, max)) onChange(Math.min(std, max)); return }
+    const v = parseFloor(text, max)
+    if (v === null) { setBad(true); return }
+    setBad(false)
+    setText(String(v))
+    if (v !== value) onChange(v)
+  }
+  return (
+    <div className={`num-box small${value !== std ? ' entered' : ''}${bad ? ' bad' : ''}`} onClick={() => box.current?.focus()}>
+      <input id={id} ref={box} type="text" inputMode="numeric" autoComplete="off" spellCheck="false"
+        value={text} aria-invalid={bad} aria-describedby="building-help" aria-label={label}
+        onChange={(e) => { setText(e.target.value); setBad(false) }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit() }
+          if (e.key === 'Escape') { escaped.current = true; setText(String(value)); setBad(false); e.currentTarget.blur() }
+        }} />
+    </div>
+  )
+}
+
+/**
+ * Building height and the window's floor (v2.8). Standard 20 floors, window
+ * on 10: mid-height, where the stack effect is near zero. Lowering the floors
+ * below the window's floor moves the window down with it.
+ */
+export function BuildingField({ floors, wfloor, onChange }) {
+  const [badBoxes, setBadBoxes] = useState({})
+  const onBad = useCallback((id, isBad) => setBadBoxes((b) => (b[id] === isBad ? b : { ...b, [id]: isBad })), [])
+  const bad = Object.values(badBoxes).some(Boolean)
+  const changed = floors !== BUILDING_INPUT.floors || wfloor !== BUILDING_INPUT.wfloor
+  const up = heightAboveMidFt(floors, wfloor)
+  const where = Math.abs(up) < 6
+    ? 'about mid-height, where the stack effect is near zero'
+    : up > 0
+      ? `${Math.round(up)} ft above mid-height: in winter the warm room air pushes out here`
+      : `${Math.round(-up)} ft below mid-height: in winter outdoor air is drawn in here`
+  return (
+    <Group title="Building" hint="Floors · window on floor">
+      <div className="num-row">
+        <FloorBox id="bld-floors" label="Number of floors" value={floors} std={BUILDING_INPUT.floors} max={BUILDING_INPUT.max}
+          onChange={(v) => onChange({ floors: v, wfloor: Math.min(wfloor, v) })} onBad={onBad} />
+        <span className="u-unit">floors, window on</span>
+        <FloorBox id="bld-wfloor" label="Floor of the window" value={wfloor} std={BUILDING_INPUT.wfloor} max={floors}
+          onChange={(v) => onChange({ wfloor: v })} onBad={onBad} />
+        {changed && !bad && <button type="button" className="u-reset" onClick={() => onChange({ floors: BUILDING_INPUT.floors, wfloor: BUILDING_INPUT.wfloor })}>Reset</button>}
+      </div>
+      <p id="building-help" className="num-help">
+        {bad
+          ? <span className="u-err">Floors {BUILDING_INPUT.min} to {BUILDING_INPUT.max}; the window's floor at most the floors</span>
+          : changed
+            ? `Window ${where}.`
+            : `Standard ${BUILDING_INPUT.floors} floors, window on ${BUILDING_INPUT.wfloor} (${where}) · type a value and press Enter`}
+      </p>
     </Group>
   )
 }

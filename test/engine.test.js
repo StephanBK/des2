@@ -251,6 +251,9 @@ test('the default engine request is pinned', () => {
     p_occ_pa: 5, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
     sealant_out: 'silicone', sealant_in: 'silicone', max_years: 2,
     f_cold: 0.014, al_out: 'wet_sealed', al_in: 'wet_sealed', grams: 0, t_in: 70, rh_in: 30,
+    // v2.8: a fixed RH (as before) and the full stack pressure, so the engine
+    // computes exactly what it did; the office occupants go along unused.
+    room_humidity: 'fixed', stack_factor: 1.0, people_gkg: 1.2, people_fade_ach: 0.5,
     trace: false, fog_map: true, years_after_full: 1,
   })
 })
@@ -478,4 +481,82 @@ test('facade and window size: the engine echo check covers them', async () => {
   assert.equal(sent.searchParams.get('height_in'), '72')
   const { c: c2 } = client({ ignore: ['orientation'] })
   await assert.rejects(c2.run(parseScenario(q({ ...BASE, facade: 'east' }))), (e) => e.status === 502 && e.detail.some((d) => d.startsWith('orientation')))
+})
+
+// ------------------------------------------------------------ v2.8: room humidity, building height
+
+test('room humidity: optional (fixed when absent), fixed or none; anything else is a 400', () => {
+  assert.equal(parseScenario(q(BASE)).hum, 'fixed')
+  assert.equal(parseScenario(q({ ...BASE, hum: 'fixed' })).hum, 'fixed')
+  assert.equal(parseScenario(q({ ...BASE, hum: 'none' })).hum, 'none')
+  assert.equal(parseScenario(q({ ...BASE, hum: '' })).hum, 'fixed')
+  for (const bad of ['unhumidified', 'None', 'dry', '1']) {
+    assert.throws(() => parseScenario(q({ ...BASE, hum: bad })), (e) => e instanceof HttpError && e.status === 400 && /^hum must/.test(e.message), bad)
+  }
+})
+
+test('room humidity reaches the engine as room_humidity, with the office occupants pinned', () => {
+  const fixed = engineParams(parseScenario(q(BASE)))
+  const none = engineParams(parseScenario(q({ ...BASE, hum: 'none' })))
+  assert.equal(fixed.room_humidity, 'fixed')
+  assert.equal(none.room_humidity, 'unhumidified')
+  for (const p of [fixed, none]) {
+    assert.equal(p.people_gkg, 1.2)
+    assert.equal(p.people_fade_ach, 0.5)
+    assert.equal(p.stack_factor, 1.0)
+    assert.equal(p.rh_in, BASE.rh)               // still sent; the engine ignores it without a humidifier
+  }
+})
+
+test('floors and window floor: optional (20 and 10), whole numbers 1 to 100, window floor at most the floors', () => {
+  const s = (extra) => parseScenario(q({ ...BASE, ...extra }))
+  assert.deepEqual([s({}).floors, s({}).wfloor], [20, 10])
+  assert.deepEqual([s({ floors: '11' }).floors, s({ floors: '11' }).wfloor], [11, 10])
+  assert.deepEqual([s({ floors: '1', wfloor: '1' }).floors, s({ floors: '1', wfloor: '1' }).wfloor], [1, 1])
+  assert.deepEqual([s({ floors: '100', wfloor: '100' }).floors, s({ floors: '100', wfloor: '100' }).wfloor], [100, 100])
+  for (const bad of ['0', '101', '2.5', '-3', 'ten', ' 5']) {
+    assert.throws(() => s({ floors: bad }), (e) => e instanceof HttpError && e.status === 400 && /^floors must/.test(e.message), `floors ${bad}`)
+    assert.throws(() => s({ floors: '100', wfloor: bad }), (e) => e instanceof HttpError && e.status === 400 && /^wfloor must/.test(e.message), `wfloor ${bad}`)
+  }
+  assert.throws(() => s({ floors: '8' }), (e) => e.status === 400 && /at most floors \(8\)/.test(e.message), 'default floor 10 in an 8-floor building')
+  assert.throws(() => s({ floors: '11', wfloor: '12' }), (e) => e.status === 400 && /at most floors/.test(e.message))
+})
+
+test('floors and window floor reach the engine as floors and window_floor', () => {
+  const p = engineParams(parseScenario(q({ ...BASE, floors: '11', wfloor: '10' })))
+  assert.equal(p.floors, 11)
+  assert.equal(p.window_floor, 10)
+  const d = engineParams(parseScenario(q(BASE)))
+  assert.deepEqual([d.floors, d.window_floor], [20, 10])
+})
+
+test('cache key: unchanged at a fixed RH and 20 / 10, different otherwise', () => {
+  const k = (extra) => scenarioKey(parseScenario(q({ ...BASE, ...extra })))
+  const base = k({})
+  assert.equal(k({ hum: 'fixed' }), base)
+  assert.equal(k({ floors: '20', wfloor: '10' }), base)
+  assert.notEqual(k({ hum: 'none' }), base)
+  assert.notEqual(k({ floors: '11' }), base)
+  assert.notEqual(k({ wfloor: '3' }), base)
+  assert.ok(k({ hum: 'none', floors: '11' }).includes('floors=11') && k({ hum: 'none', floors: '11' }).includes('hum=none'))
+})
+
+test('cache key: a scenario from before v2.8 keeps its exact key (the literal v2.7 key)', () => {
+  const s = parseScenario(q(BASE))
+  assert.equal(scenarioKey(s), `ex=single&glass=vig&seal_out=wet_sealed&seal_in=wet_sealed&lb=0&t=70&rh=30&addr=${BASE.addr.toLowerCase()}&lat=40.74844&lon=-73.98566`)
+})
+
+test('room humidity, floors and the occupants: the engine echo check covers them', async () => {
+  for (const k of ['room_humidity', 'window_floor', 'floors', 'people_gkg', 'stack_factor']) {
+    const { c } = client({ ignore: [k] })
+    await assert.rejects(c.run({ ...BASE, hum: 'none', floors: 11, wfloor: 10 }), (e) => e.status === 502 && e.detail.some((d) => d.startsWith(k)), k)
+  }
+})
+
+test('the simulated room RH (heating season) comes back with the result', async () => {
+  const { c } = client()
+  const none = await c.run({ ...BASE, hum: 'none' })
+  assert.deepEqual(none.result.room, { median_pct: 18.0, p10_pct: 10.0, p90_pct: 31.0 })
+  const fixed = await c.run(BASE)
+  assert.deepEqual(fixed.result.room, { median_pct: 30, p10_pct: 30, p90_pct: 30 })
 })

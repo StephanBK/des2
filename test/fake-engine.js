@@ -25,7 +25,7 @@ export const PRESETS = {
 
 const RENAME = { t_in: 't_in_f', rh_in: 'rh_in_pct' }
 const BOOL = new Set(['desorption', 'weekdays_only'])
-const STRING = new Set(['address', 'orientation', 'desiccant', 'sealant_out', 'sealant_in'])
+const STRING = new Set(['address', 'orientation', 'desiccant', 'sealant_out', 'sealant_in', 'room_humidity'])
 
 // Where the fake geocoder puts known addresses; anything else lands at the
 // first entry, like a real geocoder that matched something.
@@ -45,6 +45,7 @@ function lifetimePayload(q, opts) {
   }
   // What the real engine falls back to when a parameter is not sent.
   if (inputs.rh_in_pct === undefined) inputs.rh_in_pct = 35
+  if (inputs.room_humidity === undefined) inputs.room_humidity = 'fixed'
   const years = opts.years ?? 2
   const fogYear = '0'.repeat(8000) + '1'.repeat(760)
   const payload = {
@@ -65,6 +66,14 @@ function lifetimePayload(q, opts) {
       t_out_f: Array.from({ length: years * 365 }, (_, d) => (d % 365 < 100 ? 25 : 70)),
     },
     q_max_25: 0.21,
+    // v0.2.0 engine: room RH over the heating season. A fixed room is its
+    // own RH three times; "unhumidified" here is a fixed 18 % (10 to 31 %).
+    room: {
+      mode: inputs.room_humidity,
+      heating_season: inputs.room_humidity === 'unhumidified'
+        ? { median_pct: 18.0, p10_pct: 10.0, p90_pct: 31.0 }
+        : { median_pct: inputs.rh_in_pct, p10_pct: inputs.rh_in_pct, p90_pct: inputs.rh_in_pct },
+    },
     location: (() => {
       const addr = q.get('address')
       const hit = PLACES[addr] || Object.values(PLACES)[0]

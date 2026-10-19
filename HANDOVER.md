@@ -1,7 +1,10 @@
 # HANDOVER: SWR Condensation Assessment (des2, formerly "Cavity fog outlook")
 
-Last session: 2026-10-17. State: v2.7.0 (Anas's review: names, facade and
-window size inputs, customer report cleanup). Before that: 2026-10-16, v2.6.0
+Last session: 2026-10-19. State: v2.8.0 (room humidity mode "No
+humidification", building floors and window floor as inputs). Needs engine
+desiccant_life- API v0.2.0 deployed FIRST (see v2.8.0 below). Before that:
+2026-10-17, v2.7.0 (Anas's review: names, facade and window size inputs,
+customer report cleanup). Before that: 2026-10-16, v2.6.0
 (cavity depth / offset as an input,
 assembly U as a typed input, plus everything below: empty start, window assembly bar, existing single or
 double pane with WINDOW f values, customer PDF report, 3 pages with a
@@ -21,6 +24,53 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.8.0 (2026-10-19): room humidity mode, building height (CU Boulder calibration)
+
+- WHY: a report for 2000 Colorado Avenue, Boulder (CU Gamow Tower, floor 10
+  faculty offices, 29.5 x 13.625 in SWR-VIG over single pane, installed from
+  Nov 10 2025) predicted 7 fog days a year at a fixed 20 % RH; Stephan saw
+  none. The report's 20 floors / window on 10 was wrong too (the tower has
+  11 floors): corrected alone it gives 53. What decided it was the fixed
+  RH: an unhumidified Boulder room in the hours below 25 F is at a median
+  8 % RH. Stephan's call (option 2): add the mode as an OPTION, keep a fixed
+  RH as the default, plus building height inputs.
+- Room air: two buttons above the RH slider, "Fixed RH" (default, as before)
+  and "No humidification" (URL hum=none; the slider greys out). The engine
+  (room_humidity=unhumidified) uses outdoor moisture plus office occupants:
+  1.2 g/kg while occupied (36-44 W latent per worker = 53-65 g/h into
+  17 cfm/person of ASHRAE 62.1 air = 34.7 kg/h; 1.5-1.9 g/kg at full design
+  occupancy, 1.2 at about 70 %), fading after hours at 0.5 / h, 60 % RH cap
+  when warm outdoors. Pinned in FIXED (people_gkg 1.2, people_fade_ach 0.5)
+  and sent always; the engine ignores them for a fixed RH. The page line
+  under the slider and the drawing show the simulated heating-season room
+  RH (engine payload room.heating_season, in result.room).
+- Direction (8 cities x 3 assemblies, real engine code, vs fixed 30 %): total
+  fog days 1,289 -> 1,058 (-18 %); down in 15 cases, up in 6. Dry, cold
+  sites fall (Boulder des2 default 50 -> 0); humid winters rise (Seattle 0
+  -> 165; Boston aged seals 124 -> 136). Not a "less fog" switch: the right
+  room air for a building without a humidifier. Before sending Seattle,
+  Washington or New York reports, run both modes.
+- Building: "Building" box under the drawing, floors (1 to 100, URL floors=)
+  and window on floor (1 to floors, URL wfloor=), 20 / 10 by default (mid-
+  height, where stack is near zero); lowering the floors below the window's
+  floor moves the window down. The help line gives the window's height above
+  or below mid-height (11.81 ft floors). FIXED no longer holds floors /
+  window_floor; stack_factor 1.0 is pinned (no change).
+- At a fixed RH and 20 / 10 every link, cache key and report id is the same
+  as in v2.7 (tested against the literal key); the engine request gains
+  room_humidity, stack_factor, people_gkg, people_fade_ach (all echo-checked).
+  An engine older than v0.2.0 is refused by the echo check ("used different
+  inputs"): deploy the engine first, then restart des2 (24 h cache).
+- Report: page 1 subtitle "room at X F without humidification", Window row
+  "floor W of F" when changed (else "at mid-height" as before), Room air row
+  "no humidification; heating season about M % RH (p10 to p90 %)"; page 2
+  bullet and method note explain the room air in that mode. At the defaults
+  the wording is unchanged (tested). Still 3 pages with the longer row.
+- rh stays in the scenario (and the cache key) in "No humidification" mode,
+  so flipping back keeps the slider; two keys can then hold the same result.
+- Tests 121 -> 136 (fake engine knows room_humidity and returns a room
+  summary; server, link and report tests for the new inputs).
 
 ## v2.7.0 (2026-10-17): Anas's review (Falchi and Erieview runs)
 

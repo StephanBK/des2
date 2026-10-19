@@ -10,7 +10,7 @@
 // bringing the headroom back is a small change.
 
 import {
-  APP_VERSION, ASSUMPTIONS, EXISTING, FACADES, FIXED_DESCRIPTION, GLASSES, GRAMS_PER_LB, OFFSET_INPUT, SEALS_EXISTING, SEALS_RETROFIT,
+  APP_VERSION, BUILDING_INPUT, heightAboveMidFt, HUMIDITY, PEOPLE, ASSUMPTIONS, EXISTING, FACADES, FIXED_DESCRIPTION, GLASSES, GRAMS_PER_LB, OFFSET_INPUT, SEALS_EXISTING, SEALS_RETROFIT,
   thermalOf, WINDOW_INPUT, WORKING_HOURS,
 } from '../shared/scenario.js'
 import {
@@ -142,6 +142,16 @@ export async function buildReportData(scenario, { project = '', runCached, prese
       // v2.7: facade and window size from the scenario (north, 60 x 96 in when absent)
       facade: FACADES.find((f) => f.key === (scenario.facade ?? 'north')),
       window: { width: scenario.width ?? WINDOW_INPUT.width, height: scenario.height ?? WINDOW_INPUT.height },
+      // v2.8: building height and the window's floor (20 / 10 when absent)
+      building: (() => {
+        const floors = scenario.floors ?? BUILDING_INPUT.floors
+        const wfloor = scenario.wfloor ?? BUILDING_INPUT.wfloor
+        return { floors, wfloor, changed: floors !== BUILDING_INPUT.floors || wfloor !== BUILDING_INPUT.wfloor, above_mid_ft: Math.round(heightAboveMidFt(floors, wfloor)) }
+      })(),
+      // v2.8: room humidity mode, and the room RH the engine simulated over the heating season
+      hum: HUMIDITY.find((x) => x.key === (scenario.hum ?? 'fixed')),
+      room: r.room ?? null,
+      people_gkg: PEOPLE.gkg,
       seal_out: sealInfo(SEALS_EXISTING, scenario.seal_out, p?.meta?.al_out),
       seal_in: sealInfo(SEALS_RETROFIT, scenario.seal_in, p?.meta?.al_in),
       lb: scenario.lb,
