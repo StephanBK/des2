@@ -248,14 +248,14 @@ test('the default engine request is pinned', () => {
     address: '350 Fifth Avenue, New York, New York 10118, United States', orientation: 'north',
     width_in: 60, height_in: 96, offset_in: 0.6, u_ip: 0.164, r_ip: 0.97,
     desiccant: 'ms3a', desorption: true, absorptance: 0.1, floors: 20, window_floor: 10,
-    p_occ_pa: 5, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
+    p_occ_pa: 2, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
     sealant_out: 'silicone', sealant_in: 'silicone', max_years: 2,
     f_cold: 0.014, al_out: 'wet_sealed', al_in: 'wet_sealed', grams: 0, t_in: 70, rh_in: 30,
     // v2.8: a fixed RH (as before) and the full stack pressure, so the engine
     // computes exactly what it did; the office occupants go along unused.
     room_humidity: 'fixed', stack_factor: 1.0, people_gkg: 1.2, people_fade_ach: 0.5,
     // v2.9: the existing glass, for the sun and sky share (engine 0.3.0).
-    existing_glass: 'single', film_correction: true,
+    existing_glass: 'single', film_correction: true, sky_view_factor: 0.35,
     trace: false, fog_map: true, years_after_full: 1,
   })
 })

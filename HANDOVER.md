@@ -2,13 +2,16 @@
 
 Last session: 2026-10-25. State: v2.9.0: sends the existing glass to the
 engine as existing_glass ("single" / "double") and pins film_correction
-true. Engine fixes of 2026-10-25 (API v0.3.0): sun and sky reach the cavity
-face through the existing glass; the 2 m weather wind is converted to 10 m;
-f values are recomputed each hour at the engine's own outdoor film. Needs
-engine desiccant_life- API v0.3.0 deployed FIRST: an older engine does not
-echo existing_glass or film_correction and every result is withheld.
-Effect on the NYC fixture (48 cases): working days with fog 376 -> 67; at
-the default 70 F / 30 %, 52 -> 7; no case foggier. Before that: 2026-10-19, v2.8.0
+true, sky_view_factor 0.35 and p_occ_pa 2 (was 5). Engine changes of
+2026-10-25 (API v0.3.0): sun and sky reach the cavity face through the
+existing glass; f values recomputed each hour at the engine's own outdoor
+film; the 2 m weather wind kept as the wind at the window (a 10 m
+conversion was tried and taken out); sky view 0.35 for a city street;
++2 Pa occupied. Needs engine API v0.3.0 deployed FIRST: an older engine
+does not echo the new inputs and every result is withheld. Effect on real
+weather, 8 cities x 96 cases: working days with fog 23,280 -> 11,883
+(-49 %); 2 of 768 cases foggier, by 1 day. Full write-up: the Docs page
+"SWR Condensation Assessment: model changes, Oct 25 2026". Before that: 2026-10-19, v2.8.0
 (room humidity mode "No humidification", building floors and window floor
 as inputs; needed engine API v0.2.0). Before that:
 2026-10-17, v2.7.0 (Anas's review: names, facade and window size inputs,

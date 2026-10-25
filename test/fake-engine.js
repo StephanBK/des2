@@ -48,6 +48,7 @@ function lifetimePayload(q, opts) {
   if (inputs.room_humidity === undefined) inputs.room_humidity = 'fixed'
   if (inputs.existing_glass === undefined) inputs.existing_glass = 'single'
   if (inputs.film_correction === undefined) inputs.film_correction = true
+  if (inputs.sky_view_factor === undefined) inputs.sky_view_factor = 0.35
   const years = opts.years ?? 2
   const fogYear = '0'.repeat(8000) + '1'.repeat(760)
   const payload = {
