@@ -178,6 +178,9 @@ export function engineParams(s) {
     floors: s.floors ?? OPTIONAL.floors,
     window_floor: s.wfloor ?? OPTIONAL.wfloor,
     room_humidity: HUMIDITY.find((x) => x.key === (s.hum ?? OPTIONAL.hum)).engine,
+    // v2.9 (engine 0.3.0, 2026-10-25): the existing glass sets how much of
+    // the sun and sky on its outer surface reaches the cavity side.
+    existing_glass: s.ex,
     // Without desiccant nothing ever fills, so the engine would play all
     // max_years years. Two are enough: year 1 starts from a clean pane and
     // fresh cavity air (a start-up year, less fog); year 2 is the settled
@@ -216,7 +219,7 @@ const ECHO = {
   sealant_out: 'sealant_out', sealant_in: 'sealant_in', max_years: 'max_years',
   al_out: 'al_out', al_in: 'al_in',
   room_humidity: 'room_humidity', people_gkg: 'people_gkg', people_fade_ach: 'people_fade_ach',
-  stack_factor: 'stack_factor',
+  stack_factor: 'stack_factor', existing_glass: 'existing_glass',
 }
 // Checked elsewhere: trace (response shape), fog_map and years_after_full
 // (payload.fog).

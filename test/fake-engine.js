@@ -25,7 +25,7 @@ export const PRESETS = {
 
 const RENAME = { t_in: 't_in_f', rh_in: 'rh_in_pct' }
 const BOOL = new Set(['desorption', 'weekdays_only'])
-const STRING = new Set(['address', 'orientation', 'desiccant', 'sealant_out', 'sealant_in', 'room_humidity'])
+const STRING = new Set(['address', 'orientation', 'desiccant', 'sealant_out', 'sealant_in', 'room_humidity', 'existing_glass'])
 
 // Where the fake geocoder puts known addresses; anything else lands at the
 // first entry, like a real geocoder that matched something.
@@ -46,6 +46,7 @@ function lifetimePayload(q, opts) {
   // What the real engine falls back to when a parameter is not sent.
   if (inputs.rh_in_pct === undefined) inputs.rh_in_pct = 35
   if (inputs.room_humidity === undefined) inputs.room_humidity = 'fixed'
+  if (inputs.existing_glass === undefined) inputs.existing_glass = 'single'
   const years = opts.years ?? 2
   const fogYear = '0'.repeat(8000) + '1'.repeat(760)
   const payload = {

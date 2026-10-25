@@ -254,6 +254,8 @@ test('the default engine request is pinned', () => {
     // v2.8: a fixed RH (as before) and the full stack pressure, so the engine
     // computes exactly what it did; the office occupants go along unused.
     room_humidity: 'fixed', stack_factor: 1.0, people_gkg: 1.2, people_fade_ach: 0.5,
+    // v2.9: the existing glass, for the sun and sky share (engine 0.3.0).
+    existing_glass: 'single',
     trace: false, fog_map: true, years_after_full: 1,
   })
 })
@@ -547,9 +549,11 @@ test('cache key: a scenario from before v2.8 keeps its exact key (the literal v2
 })
 
 test('room humidity, floors and the occupants: the engine echo check covers them', async () => {
-  for (const k of ['room_humidity', 'window_floor', 'floors', 'people_gkg', 'stack_factor']) {
+  for (const k of ['room_humidity', 'window_floor', 'floors', 'people_gkg', 'stack_factor', 'existing_glass']) {
     const { c } = client({ ignore: [k] })
-    await assert.rejects(c.run({ ...BASE, hum: 'none', floors: 11, wfloor: 10 }), (e) => e.status === 502 && e.detail.some((d) => d.startsWith(k)), k)
+    // ex double: the fake engine's fallback for an unechoed existing_glass is
+    // 'single', so only a double pane shows the check firing.
+    await assert.rejects(c.run({ ...BASE, ex: 'double', hum: 'none', floors: 11, wfloor: 10 }), (e) => e.status === 502 && e.detail.some((d) => d.startsWith(k)), k)
   }
 })
 
@@ -559,4 +563,11 @@ test('the simulated room RH (heating season) comes back with the result', async 
   assert.deepEqual(none.result.room, { median_pct: 18.0, p10_pct: 10.0, p90_pct: 31.0 })
   const fixed = await c.run(BASE)
   assert.deepEqual(fixed.result.room, { median_pct: 30, p10_pct: 30, p90_pct: 30 })
+})
+
+test('the existing glass reaches the engine as existing_glass (v2.9, engine 0.3.0)', () => {
+  assert.equal(engineParams(parseScenario(q({ ...BASE, ex: 'single' }))).existing_glass, 'single')
+  assert.equal(engineParams(parseScenario(q({ ...BASE, ex: 'double' }))).existing_glass, 'double')
+  // Every existing-glass key is one the engine knows.
+  for (const e of EXISTING) assert.ok(['single', 'double'].includes(e.key), e.key)
 })
