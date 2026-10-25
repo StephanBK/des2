@@ -24,7 +24,7 @@ export const PRESETS = {
 }
 
 const RENAME = { t_in: 't_in_f', rh_in: 'rh_in_pct' }
-const BOOL = new Set(['desorption', 'weekdays_only'])
+const BOOL = new Set(['desorption', 'weekdays_only', 'film_correction'])
 const STRING = new Set(['address', 'orientation', 'desiccant', 'sealant_out', 'sealant_in', 'room_humidity', 'existing_glass'])
 
 // Where the fake geocoder puts known addresses; anything else lands at the
@@ -47,6 +47,7 @@ function lifetimePayload(q, opts) {
   if (inputs.rh_in_pct === undefined) inputs.rh_in_pct = 35
   if (inputs.room_humidity === undefined) inputs.room_humidity = 'fixed'
   if (inputs.existing_glass === undefined) inputs.existing_glass = 'single'
+  if (inputs.film_correction === undefined) inputs.film_correction = true
   const years = opts.years ?? 2
   const fogYear = '0'.repeat(8000) + '1'.repeat(760)
   const payload = {

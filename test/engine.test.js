@@ -255,7 +255,7 @@ test('the default engine request is pinned', () => {
     // computes exactly what it did; the office occupants go along unused.
     room_humidity: 'fixed', stack_factor: 1.0, people_gkg: 1.2, people_fade_ach: 0.5,
     // v2.9: the existing glass, for the sun and sky share (engine 0.3.0).
-    existing_glass: 'single',
+    existing_glass: 'single', film_correction: true,
     trace: false, fog_map: true, years_after_full: 1,
   })
 })

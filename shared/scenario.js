@@ -199,6 +199,9 @@ export const FIXED = {
   // for a fixed RH).
   stack_factor: 1.0,
   people_gkg: PEOPLE.gkg, people_fade_ach: PEOPLE.fade_ach,
+  // v2.9 (engine 0.3.0): f values recomputed each hour at the engine's own
+  // outdoor film instead of the NFRC 26 W/m2K one they were computed with.
+  film_correction: true,
 }
 
 // Whole years simulated after the desiccant fills, so the first winter
@@ -228,7 +231,7 @@ export const ASSUMPTIONS = [
   'With desorption on, the desiccant gives some water back when warm and takes it up again when cold, a small seasonal buffer: slightly less fog after it is full, and a longer life. The engine gives 3A no extra capacity below 25 °C; real 3A holds a few percent more when cold, so the results are on the cautious side here.',
   'After the desiccant is full, the pane fogs about as much as with no desiccant. What decides how much is the real air leakage of the wet seals, which has not been measured on an installed cavity.',
   'Each pairing of existing glass and retrofit glass has its own cavity-side temperature factor and assembly U-value (hover a glass button to see them). Over an existing single pane: from WINDOW and INOVUES. Over an existing double pane: f from WINDOW; U estimated from a layer-by-layer heat-flow model until WINDOW results replace it. A U typed into the U-value box replaces the table value for the chosen glass; f stays as listed, although in a real window the two move together.',
-  'Sun and sky act on the outer surface of the existing window. The cavity side gets its share through the existing glass (a 1/4 in pane, or the whole insulating unit of an existing double pane), with part of the heat flowing on to the room. The weather file\'s wind is measured at 2 m and converted to the 10 m wind the pressure and surface formulas assume.',
+  'Sun and sky act on the outer surface of the existing window. The cavity side gets its share through the existing glass (a 1/4 in pane, or the whole insulating unit of an existing double pane), with part of the heat flowing on to the room. The weather file\'s wind is measured at 2 m and converted to the 10 m wind the pressure and surface formulas assume. The glass factors f come from WINDOW at a standard outdoor wind of about 12 mph; each hour they are adjusted to that hour\'s wind, so calm hours leave the glass a little warmer and windy hours a little colder.',
   'The cavity depth changes only the cavity air volume in the simulation. The glass factor f, the U-value and the air-gap resistance are the values for a 0.6 in cavity, so a deeper or shallower cavity does not yet change the glass temperatures. Because air leaks in per square foot of window, not per cubic foot of cavity, depth alone has a small effect on fog.',
   '"Desiccant full" means 95 % of its capacity at 25 °C.',
   'The same typical weather year repeats; no climate trend or unusual years.',

@@ -219,7 +219,7 @@ const ECHO = {
   sealant_out: 'sealant_out', sealant_in: 'sealant_in', max_years: 'max_years',
   al_out: 'al_out', al_in: 'al_in',
   room_humidity: 'room_humidity', people_gkg: 'people_gkg', people_fade_ach: 'people_fade_ach',
-  stack_factor: 'stack_factor', existing_glass: 'existing_glass',
+  stack_factor: 'stack_factor', existing_glass: 'existing_glass', film_correction: 'film_correction',
 }
 // Checked elsewhere: trace (response shape), fog_map and years_after_full
 // (payload.fog).
