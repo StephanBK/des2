@@ -347,7 +347,8 @@ test('report PDF (v2.10): only the picked glass, no "Reading the results", build
     const r = await s.get(`/api/report?${qs({ glass, pa: '4' })}`)
     assert.equal(r.status, 200)
     const text = pdfText(r.body).replace(/\s+/g, ' ')
-    assert.match(text, new RegExp(`INOVUES retrofit glass at this site`))
+    assert.doesNotMatch(text, /retrofit glass at this site|Details on page 3/, 'page-1 glass strip removed')
+    assert.doesNotMatch(text, /SWR-VIG \(VIG\)|SWR-VIG VIG\b/, 'no VIG after SWR-VIG')
     assert.ok(named(text, product), `${glass}: ${product} named`)
     for (const o of others) assert.ok(!named(text, o), `${glass}: no ${o} anywhere in the report`)
     assert.doesNotMatch(text, /All three/i)
@@ -356,4 +357,28 @@ test('report PDF (v2.10): only the picked glass, no "Reading the results", build
     assert.match(text, /Building pressure \+4 Pa HVAC, weekdays 7 am to 7 pm/)
     assert.equal((r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 3)
   }
+})
+
+test('glass names (2026-10-26): the type only where the product name does not already say it', async () => {
+  const { glassName, typeInName } = await import('../server/report-pdf.js')
+  const { GLASSES } = await import('../shared/scenario.js')
+  const by = Object.fromEntries(GLASSES.map((g) => [g.key, g]))
+  assert.equal(typeInName(by.vig), true)
+  assert.equal(glassName(by.vig), 'SWR-VIG')
+  assert.equal(glassName(by.vig, { midSentence: true }), 'SWR-VIG')
+  assert.equal(glassName(by.double), 'SWR-IG (Double pane)')
+  assert.equal(glassName(by.double, { midSentence: true }), 'SWR-IG (double pane)')
+  assert.equal(glassName(by.single), 'SWR (Single pane)')
+  assert.equal(glassName(by.single, { midSentence: true }), 'SWR (single pane)')
+})
+
+test('report PDF glass naming: "SWR-VIG" alone, the others with their type', { skip: !hasPdftotext && 'pdftotext not installed' }, async (t) => {
+  const s = await start(t)
+  const vig = pdfText((await s.get(`/api/report?${qs({ glass: 'vig' })}`)).body).replace(/\s+/g, ' ')
+  assert.match(vig, /with an INOVUES SWR-VIG retrofit/)
+  assert.match(vig, /Retrofit glass SWR-VIG /)
+  assert.doesNotMatch(vig, /\(VIG\)/)
+  const dbl = pdfText((await s.get(`/api/report?${qs({ glass: 'double' })}`)).body).replace(/\s+/g, ' ')
+  assert.match(dbl, /with an INOVUES SWR-IG \(double pane\) retrofit/)
+  assert.match(dbl, /SWR-IG Double pane/, 'page 3 row keeps the type under SWR-IG')
 })

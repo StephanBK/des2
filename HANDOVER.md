@@ -58,7 +58,13 @@ run" with the detail "engine returned no fog map": by design, not a crash.
   "INOVUES retrofit glass at this site"; page 3 is "Retrofit glass" with one
   row; "Reading the results" removed (fogPattern deleted); page 1 Site box
   has "Building pressure".
-- Tests: 141 (pressure parse / link / engine param / report / PDF text).
+- Same day, second pass: page-1 glass strip deleted (it repeated the fog
+  days card); glass type printed only where the product name does not
+  already say it (report-pdf.js glassName / typeInName): "SWR-VIG", but
+  "SWR-IG (Double pane)" and "SWR (Single pane)". Pressure stays
+  occupied hours only (Stephan confirmed).
+- Tests: 143 (pressure parse / link / engine param / report / PDF text /
+  glass names).
 
 ## v2.8.0 (2026-10-19): room humidity mode, building height (CU Boulder calibration)
 

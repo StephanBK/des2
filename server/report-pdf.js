@@ -11,7 +11,9 @@
 // desiccant; the ENTERED note and tags, the U asterisk, the options footnotes,
 // the humidity headroom chart and every "clear up to X %" line are gone.
 // Stephan 2026-10-26 (v2.10): only the glass the user picked (no three-glass
-// strip or table), no "Reading the results" section, building pressure shown.
+// strip or table), no "Reading the results" section, building pressure shown;
+// later the same day: no page-1 glass strip at all, and no glass type after a
+// product name that already says it ("SWR-VIG", not "SWR-VIG (VIG)").
 //
 // The font has no arrows or comparison signs: text uses words for those.
 
@@ -175,6 +177,15 @@ function splitAddress(full) {
 /** "single pane", "double pane", "VIG": a label as it reads mid-sentence. */
 const inSentence = (label) => (label === label.toUpperCase() ? label : label.toLowerCase())
 
+/** True when the product name already says the glass type (SWR-VIG is a VIG), so the label would only repeat it. */
+export const typeInName = (g) => g.product.toUpperCase().endsWith(g.label.toUpperCase())
+
+/** A retrofit glass by name (Stephan 2026-10-26): "SWR-VIG", but "SWR-IG (Double pane)" and "SWR (Single pane)". */
+export function glassName(g, { midSentence = false } = {}) {
+  if (typeInName(g)) return g.product
+  return `${g.product} (${midSentence ? inSentence(g.label) : g.label})`
+}
+
 /** The page-1 verdict: what a customer should take away, in one line. */
 function verdictOf(data) {
   const r = data.result
@@ -216,7 +227,7 @@ function SummaryPage({ data }) {
     rest ? h(Text, { style: s.h1sub }, rest) : null,
     h(Text, { style: { fontSize: 9.5, color: C.ink2, marginTop: 8 } },
       // \u00a0 (no-break space) keeps each number on the same line as its unit.
-      `Secondary window retrofit: existing ${inSentence(cfg.existing.label)} with an INOVUES ${cfg.glass.product} (${inSentence(cfg.glass.label)}) retrofit, ${cfg.lb ? `${cfg.lb}\u00a0lb of desiccant, ` : ''}room at ${cfg.t}\u00a0°F ${cfg.hum?.key === 'none' ? 'without humidification' : `and ${cfg.rh}\u00a0% RH`}.`),
+      `Secondary window retrofit: existing ${inSentence(cfg.existing.label)} with an INOVUES ${glassName(cfg.glass, { midSentence: true })} retrofit, ${cfg.lb ? `${cfg.lb}\u00a0lb of desiccant, ` : ''}room at ${cfg.t}\u00a0°F ${cfg.hum?.key === 'none' ? 'without humidification' : `and ${cfg.rh}\u00a0% RH`}.`),
 
     h(View, { style: { marginTop: 13, backgroundColor: tone.bg, borderLeftWidth: 4, borderLeftColor: tone.bd, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 2 } },
       h(Text, { style: { fontSize: 7.5, fontWeight: 600, letterSpacing: 1.2, color: tone.ink } }, 'OUTLOOK FOR A TYPICAL YEAR'),
@@ -239,7 +250,7 @@ function SummaryPage({ data }) {
       h(View, { style: { flex: 1 } },
         h(Text, { style: s.h3 }, 'Window assembly'),
         h(KV, { k: 'Existing glass', v: cfg.existing.label }),
-        h(KV, { k: 'Retrofit glass', v: `${cfg.glass.product} (${cfg.glass.label})` }),
+        h(KV, { k: 'Retrofit glass', v: glassName(cfg.glass) }),
         // U last, so the ESTIMATE tag sits right after the value it qualifies.
         h(KV, { k: 'Thermal values', v: `f ${cfg.thermal.f_cold.toFixed(3)}, U ${cfg.thermal.u_ip.toFixed(3)} Btu/hr·ft²·°F`, extra: est ? h(Tag, { text: 'ESTIMATE' }) : null }),
         h(KV, { k: 'Cavity', v: cfg.offset.changed ? `${fmtIn(cfg.offset.inches)} in; f and U as for ${fmtIn(cfg.offset.standard)} in` : `${fmtIn(cfg.offset.inches)} in between existing glass and retrofit` }),
@@ -248,28 +259,13 @@ function SummaryPage({ data }) {
         cfg.lb ? h(KV, { k: 'Desiccant', v: `${cfg.lb} lb (${cfg.grams.toLocaleString('en-US')} g) 3A molecular sieve` }) : null,
         h(KV, { k: 'Room air', v: roomAirText(cfg) }))),
 
-    h(Glance, { data }),
-    est ? h(View, { style: { marginTop: 9, backgroundColor: C.amberSoft, borderLeftWidth: 3, borderLeftColor: C.amber, paddingVertical: 4, paddingHorizontal: 8 } },
+    // The glass strip ("Glance") was removed 2026-10-26: with one glass it only
+    // repeated the fog days card above.
+    est ? h(View, { style: { marginTop: 12, backgroundColor: C.amberSoft, borderLeftWidth: 3, borderLeftColor: C.amber, paddingVertical: 4, paddingHorizontal: 8 } },
       h(Text, { style: { fontSize: 7.6, color: C.amberInk } },
         'ESTIMATE: the assembly U-value for an existing double pane is a heat-flow model estimate until a WINDOW result replaces it.'))
       : null,
     h(Footer, { data }))
-}
-
-// The picked retrofit glass in one strip (v2.10: only that one), details on page 3.
-function Glance({ data }) {
-  const o = data.options.find((x) => x.selected)
-  return h(View, { style: { marginTop: 13 }, wrap: false },
-    h(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 } },
-      h(Text, { style: s.h3 }, 'INOVUES retrofit glass at this site'),
-      h(Text, { style: s.small }, 'Details on page 3')),
-    h(View, { style: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.2, borderColor: C.teal, borderRadius: 2, paddingVertical: 7, paddingHorizontal: 11, backgroundColor: C.tealSoft } },
-      h(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-        h(View, { style: { width: 7, height: 7, borderRadius: 4, backgroundColor: GLASS_COLOR[o.key], marginRight: 6 } }),
-        h(Text, { style: { fontSize: 10, fontWeight: 600 } }, o.product),
-        h(Text, { style: { fontSize: 8.5, color: C.ink2, marginLeft: 5 } }, o.label)),
-      h(Text, { style: { fontSize: 13, fontWeight: 600, color: o.fog_days_per_year ? C.fogInk : C.tealInk } },
-        `${o.fog_days_per_year} fog ${o.fog_days_per_year === 1 ? 'day' : 'days'} a year`)))
 }
 
 // ------------------------------------------------------------ page 2: calendar
@@ -460,7 +456,7 @@ function OptionsTable({ data }) {
         h(View, { style: { width: 7, height: 7, borderRadius: 4, backgroundColor: GLASS_COLOR[o.key], marginRight: 5 } }),
         h(View, null,
           h(Text, { style: { fontSize: 8.8, fontWeight: 600 } }, o.product),
-          h(Text, { style: { fontSize: 7, color: C.ink3 } }, o.label))),
+          typeInName(o) ? null : h(Text, { style: { fontSize: 7, color: C.ink3 } }, o.label))),
       cell('u', o.thermal.u_ip.toFixed(3)),
       cell('f', o.thermal.f_cold.toFixed(3)),
       withDesiccant ? cell('life', lifeText(o)) : null,
