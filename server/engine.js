@@ -10,7 +10,7 @@
 //   5. An engine without the fog-map API is reported as out of date.
 
 import {
-  ADDRESS, BUILDING_INPUT, EXISTING, FACADES, FIXED, GLASSES, GRAMS_PER_LB, HUMIDITY, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, U_INPUT, WINDOW_INPUT, YEARS_AFTER_FULL,
+  ADDRESS, BUILDING_INPUT, EXISTING, FACADES, FIXED, GLASSES, GRAMS_PER_LB, HUMIDITY, normalizeU, OFFSET_INPUT, PRESSURE_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, SITE_TOL_DEG, thermalOf, U_INPUT, WINDOW_INPUT, YEARS_AFTER_FULL,
 } from '../shared/scenario.js'
 
 export class HttpError extends Error {
@@ -21,14 +21,15 @@ export class HttpError extends Error {
   }
 }
 
-export const CONTROLS = ['ex', 'glass', 'u', 'offset', 'facade', 'width', 'height', 'floors', 'wfloor', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'hum', 'addr', 'lat', 'lon']
+export const CONTROLS = ['ex', 'glass', 'u', 'offset', 'facade', 'width', 'height', 'floors', 'wfloor', 'pa', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'hum', 'addr', 'lat', 'lon']
 // Optional controls and the value they take when absent; a scenario at that
 // value keeps its pre-v2.5 cache key and report id (facade, width and height
 // since v2.7: north, 60 x 96 in, the values that were fixed before; floors,
-// window floor and room humidity since v2.8: 20, 10 and a fixed RH).
+// window floor and room humidity since v2.8: 20, 10 and a fixed RH; building
+// pressure since v2.10: 0 Pa).
 const OPTIONAL = {
   u: null, offset: OFFSET_INPUT.default, facade: 'north', width: WINDOW_INPUT.width, height: WINDOW_INPUT.height,
-  floors: BUILDING_INPUT.floors, wfloor: BUILDING_INPUT.wfloor, hum: 'fixed',
+  floors: BUILDING_INPUT.floors, wfloor: BUILDING_INPUT.wfloor, pa: PRESSURE_INPUT.default, hum: 'fixed',
 }
 
 /** True when an optional control is absent or at its default (left out of keys and links). */
@@ -105,6 +106,12 @@ function building(params) {
   return { floors, wfloor }
 }
 
+/** Building pressure in occupied hours, Pa (v2.10): optional; absent or empty = 0. A "-0" is 0. */
+function paValue(raw) {
+  if (raw === null || raw === undefined || raw === '') return OPTIONAL.pa
+  return intInRange('pa', raw, PRESSURE_INPUT) || 0
+}
+
 /** Room humidity mode (v2.8): optional; absent or empty = a fixed RH. */
 function humValue(raw) {
   if (raw === null || raw === undefined || raw === '') return OPTIONAL.hum
@@ -144,6 +151,7 @@ export function parseScenario(params) {
     width: windowSide('width', params.get('width'), WINDOW_INPUT.width),
     height: windowSide('height', params.get('height'), WINDOW_INPUT.height),
     ...building(params),
+    pa: paValue(params.get('pa')),
     seal_out: oneOf('seal_out', params.get('seal_out'), SEALS_EXISTING),
     seal_in: oneOf('seal_in', params.get('seal_in'), SEALS_RETROFIT),
     lb: intInRange('lb', params.get('lb'), RANGES.lb),
@@ -178,6 +186,8 @@ export function engineParams(s) {
     floors: s.floors ?? OPTIONAL.floors,
     window_floor: s.wfloor ?? OPTIONAL.wfloor,
     room_humidity: HUMIDITY.find((x) => x.key === (s.hum ?? OPTIONAL.hum)).engine,
+    // v2.10: building pressure in occupied hours from the slider (0 Pa when absent).
+    p_occ_pa: s.pa ?? OPTIONAL.pa,
     // v2.9 (engine 0.3.0, 2026-10-25): the existing glass sets how much of
     // the sun and sky on its outer surface reaches the cavity side.
     existing_glass: s.ex,

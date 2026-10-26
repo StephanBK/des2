@@ -110,3 +110,17 @@ test('link: humidity mode and building left out at their defaults, in their plac
   assert.match(q, /&rh=30&hum=none&addr=/)
   assert.match(queryOf({ ...s, floors: 11, wfloor: 3 }), /&floors=11&wfloor=3&seal_out=/)
 })
+
+test('link: building pressure (v2.10) read back; 0 left out; invalid falls back to 0', async () => {
+  const { parsePa } = await import('../web/src/api.js')
+  for (let pa = -10; pa <= 10; pa += 2) assert.equal(parsePa(String(pa)), pa)
+  assert.ok(Object.is(parsePa('-0'), 0))
+  for (const bad of [null, '', '12', '-12', '3', '-1', '2.0', 'x', '+4']) assert.equal(parsePa(bad), 0, String(bad))
+  const site = `&addr=${encodeURIComponent(EXAMPLE_SITE.addr)}`
+  assert.equal(readUrlScenario(`?ex=single&glass=vig&pa=-6${site}`).pa, -6)
+  assert.equal(readUrlScenario(`?ex=single&glass=vig${site}`).pa, 0, 'old links (no pa) read as 0 Pa')
+  const s = { ...DEFAULTS, ...EXAMPLE_SITE }
+  assert.equal(new URLSearchParams(queryOf(s)).has('pa'), false, '0 Pa stays out of the link')
+  assert.match(queryOf({ ...s, pa: -4 }), /^ex=single&glass=vig&pa=-4&seal_out=/)
+  assert.match(queryOf({ ...s, floors: 30, pa: 6 }), /&floors=30&pa=6&seal_out=/)
+})

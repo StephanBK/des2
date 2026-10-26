@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BUILDING_INPUT, EXISTING, FACADES, GLASSES, glassTip, heightAboveMidFt, HUMIDITY, normalizeU, OFFSET_INPUT, PEOPLE, RANGES, thermalOf, U_INPUT, WINDOW_INPUT } from '../../shared/scenario.js'
+import { BUILDING_INPUT, EXISTING, FACADES, formatPa, GLASSES, glassTip, heightAboveMidFt, HUMIDITY, normalizeU, OFFSET_INPUT, PEOPLE, PRESSURE_INPUT, RANGES, thermalOf, U_INPUT, WINDOW_INPUT } from '../../shared/scenario.js'
 import { parseFloor, parseOffset, parseU, parseWindowSide } from './api.js'
 
 // Leak bar length on a log scale: the ladders span 0.005 to 2.0 cfm/ft2,
@@ -64,12 +64,12 @@ export function SealLadder({ title, items, value, onPick, engineValues }) {
   )
 }
 
-function Slider({ id, label, value, unit, range, onChange, ticks, disabled = false }) {
+function Slider({ id, label, value, unit, range, onChange, ticks, disabled = false, format = null }) {
   return (
     <div className={`slider${disabled ? ' off' : ''}`}>
       <label htmlFor={id} className="slider-top">
         <span>{label}</span>
-        <output htmlFor={id} className="slider-val">{value}{unit}</output>
+        <output htmlFor={id} className="slider-val">{format ? format(value) : `${value}${unit}`}</output>
       </label>
       <input id={id} type="range" min={range.min} max={range.max} step={range.step} value={value} disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
@@ -352,6 +352,25 @@ export function DesiccantSlider({ value, onChange }) {
   return (
     <Group title="Desiccant">
       <Slider id="lb" label="Per window" value={value} unit=" lb" range={RANGES.lb} ticks={ticks} onChange={onChange} />
+    </Group>
+  )
+}
+
+/**
+ * Building pressure in occupied hours (v2.10): -10 to +10 Pa in steps of 2,
+ * 0 by default. The line under it says what the sign means.
+ */
+export function PressureSlider({ value, onChange }) {
+  const sign = value > 0
+    ? 'Pressurized: the building pushes room air into the cavity.'
+    : value < 0
+      ? 'Under-pressurized: the building draws outdoor air in through the cavity.'
+      : 'Neutral: only stack and wind move air.'
+  return (
+    <Group title="Building pressure" hint="Weekdays 7 am to 7 pm">
+      <Slider id="pa" label="HVAC pressure" value={value} range={PRESSURE_INPUT} format={formatPa}
+        ticks={[`−${-PRESSURE_INPUT.min}`, '0', `+${PRESSURE_INPUT.max}`]} onChange={onChange} />
+      <p className="num-help" aria-live="polite">{sign} 0 Pa outside those hours; stack and wind act on top.</p>
     </Group>
   )
 }

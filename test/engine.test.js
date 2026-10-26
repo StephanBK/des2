@@ -248,7 +248,8 @@ test('the default engine request is pinned', () => {
     address: '350 Fifth Avenue, New York, New York 10118, United States', orientation: 'north',
     width_in: 60, height_in: 96, offset_in: 0.6, u_ip: 0.164, r_ip: 0.97,
     desiccant: 'ms3a', desorption: true, absorptance: 0.1, floors: 20, window_floor: 10,
-    p_occ_pa: 2, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
+    // v2.10: 0 Pa in occupied hours by default (the slider; was a fixed +2).
+    p_occ_pa: 0, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
     sealant_out: 'silicone', sealant_in: 'silicone', max_years: 2,
     f_cold: 0.014, al_out: 'wet_sealed', al_in: 'wet_sealed', grams: 0, t_in: 70, rh_in: 30,
     // v2.8: a fixed RH (as before) and the full stack pressure, so the engine
@@ -258,6 +259,32 @@ test('the default engine request is pinned', () => {
     existing_glass: 'single', film_correction: true, sky_view_factor: 0.35,
     trace: false, fog_map: true, years_after_full: 1,
   })
+})
+
+test('building pressure (v2.10): -10 to +10 Pa in steps of 2, 0 by default, sent as p_occ_pa', () => {
+  // absent, empty, "0" and "-0" all mean 0 and keep the old key
+  for (const raw of [undefined, '', '0', '-0']) {
+    const params = q(BASE)
+    if (raw !== undefined) params.set('pa', raw)
+    const s = parseScenario(params)
+    assert.ok(Object.is(s.pa, 0), `pa "${raw}" -> ${s.pa}`)
+    assert.equal(scenarioKey(s), scenarioKey(BASE), `pa "${raw}" keeps the key`)
+    assert.equal(engineParams(s).p_occ_pa, 0)
+  }
+  // every slider stop is accepted, sent to the engine, and changes the key
+  for (let pa = -10; pa <= 10; pa += 2) {
+    const s = parseScenario(q({ ...BASE, pa }))
+    assert.equal(s.pa, pa)
+    assert.equal(engineParams(s).p_occ_pa, pa)
+    assert.equal(engineParams(s).p_unocc_pa, 0, 'unoccupied hours stay at 0 Pa')
+    if (pa !== 0) assert.match(scenarioKey(s), new RegExp(`(^|&)pa=${pa}(&|$)`))
+  }
+  // off the range, off the steps, or not a whole number: refused
+  for (const bad of ['12', '-12', '1', '-3', '2.0', '+4', 'x', ' 2']) {
+    assert.throws(() => parseScenario(q({ ...BASE, pa: bad })), (e) => e.status === 400 && /pa/.test(e.message), `pa "${bad}"`)
+  }
+  // no longer a hidden fixed input
+  assert.equal('p_occ_pa' in FIXED, false)
 })
 
 test('each existing + retrofit pairing sends its own U and f', () => {

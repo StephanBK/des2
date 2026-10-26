@@ -1,6 +1,13 @@
 # HANDOVER: SWR Condensation Assessment (des2, formerly "Cavity fog outlook")
 
-Last session: 2026-10-25. State: v2.9.0: sends the existing glass to the
+Last session: 2026-10-26. State: v2.10.0: the HVAC building pressure in
+occupied hours (weekdays 7 am to 7 pm) is a slider, -10 to +10 Pa in steps
+of 2, default 0 Pa (was a fixed +2), sent as p_occ_pa (URL key pa, left out
+of links and cache keys at 0). The customer report shows only the glass the
+user picked (page 1 strip and page 3 table; one engine run per report
+instead of three), the "Reading the results" section on page 2 is gone, and
+page 1 shows the building pressure. No engine change (engine 0.3.0 already
+accepts and echoes negative p_occ_pa). Before that: 2026-10-25, v2.9.0: sends the existing glass to the
 engine as existing_glass ("single" / "double") and pins film_correction
 true, sky_view_factor 0.35 and p_occ_pa 2 (was 5). Engine changes of
 2026-10-25 (API v0.3.0): sun and sky reach the cavity face through the
@@ -35,6 +42,23 @@ at 0.16. Both apps call the same desiccant_life- engine.
 2. This repo: Railway service from StephanBK/des2, no variables needed.
 If the engine lacks the fog map, the page shows "The simulation did not
 run" with the detail "engine returned no fog map": by design, not a crash.
+
+## v2.10.0 (2026-10-26): building pressure slider, one-glass report
+
+- Building pressure: `PRESSURE_INPUT` in shared/scenario.js (min -10, max
+  10, step 2, default 0). `p_occ_pa` left FIXED and now comes from the
+  scenario's `pa` in engineParams; p_unocc_pa stays 0 and the occupied
+  schedule stays weekdays 7 to 19. Positive = pressurized (room air pushed
+  into the cavity, more fog); negative = outdoor air drawn in (less fog).
+  Live engine at 350 Fifth Ave, single + VIG, aged / dry-seal tight, 0 lb,
+  70 F / 30 %: fog days a year 0 / 0 / 1 / 21 / 55 at -10 / -4 / 0 / +4 /
+  +10 Pa. Old links without pa now run at 0 Pa (the new default), not +2.
+- Report: buildReportData runs the scenario only (no other glasses);
+  `options` holds one entry, the picked glass. Glance strip retitled
+  "INOVUES retrofit glass at this site"; page 3 is "Retrofit glass" with one
+  row; "Reading the results" removed (fogPattern deleted); page 1 Site box
+  has "Building pressure".
+- Tests: 141 (pressure parse / link / engine param / report / PDF text).
 
 ## v2.8.0 (2026-10-19): room humidity mode, building height (CU Boulder calibration)
 

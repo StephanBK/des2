@@ -85,8 +85,8 @@ export default function ReportDialog({ open, onClose, scenario, siteLabel }) {
           <button type="button" className="close" onClick={close}>Close</button>
         </div>
         <p className="modal-lead">
-          A 3-page PDF for <strong>{siteLabel}</strong>: the outlook, the hour-by-hour calendar, all three
-          retrofit glasses compared, the site climate and how the assessment works.
+          A 3-page PDF for <strong>{siteLabel}</strong>: the outlook, the hour-by-hour calendar, the chosen
+          retrofit glass, the site climate and how the assessment works.
         </p>
         <label className="modal-label" htmlFor="report-project">Project or customer name <span>(optional, shown on the cover)</span></label>
         <input id="report-project" type="text" maxLength={80} value={project} placeholder="e.g. Lobby retrofit, phase 2"

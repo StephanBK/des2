@@ -1,17 +1,18 @@
 // Everything the customer report shows, gathered and computed in one place.
 // No drawing here (that is report-pdf.js), so it can be tested on its own.
 //
-// Runs behind one report (each cached like a normal page run):
-//   1. the scenario on screen
-//   2. the same scenario with each other retrofit glass (options table)
+// Runs behind one report (cached like a normal page run): the scenario on
+// screen, and nothing else. Until v2.9 the same scenario also ran with each
+// other retrofit glass for a three-glass comparison; since v2.10 (Stephan
+// 2026-10-26) the report shows only the glass the user picked.
 // The room-humidity sweeps behind "humidity headroom" / "clear up to X %"
 // were switched off 2026-10-17 (Anas: remove for now). headroomOf, RH_LEVELS,
 // the server's sweepCached and the engine client's sweepRh are kept, so
 // bringing the headroom back is a small change.
 
 import {
-  APP_VERSION, BUILDING_INPUT, heightAboveMidFt, HUMIDITY, PEOPLE, ASSUMPTIONS, EXISTING, FACADES, FIXED_DESCRIPTION, GLASSES, GRAMS_PER_LB, OFFSET_INPUT, SEALS_EXISTING, SEALS_RETROFIT,
-  thermalOf, WINDOW_INPUT, WORKING_HOURS,
+  APP_VERSION, BUILDING_INPUT, formatPa, heightAboveMidFt, HUMIDITY, PEOPLE, ASSUMPTIONS, EXISTING, FACADES, FIXED, FIXED_DESCRIPTION, GLASSES, GRAMS_PER_LB, OFFSET_INPUT, PRESSURE_INPUT,
+  SEALS_EXISTING, SEALS_RETROFIT, thermalOf, WINDOW_INPUT, WORKING_HOURS,
 } from '../shared/scenario.js'
 import {
   fogDaysPerYear, headlineCards, HOURS_PER_YEAR, MONTH_SHORT, MONTH_START_DAY, summarize, yearStats,
@@ -99,15 +100,10 @@ function summaryOf(r) {
  * (sweepCached may still be passed; it is not used while the headroom is off.)
  */
 export async function buildReportData(scenario, { project = '', runCached, presets, key, appUrl, now = new Date() }) {
-  const others = GLASSES.filter((g) => g.key !== scenario.glass)
-  // A typed U belongs to the chosen glass only; the other two use their table U.
-  const asGlass = (gk) => (gk === scenario.glass ? scenario : { ...scenario, glass: gk, u: null })
-  const [main, p, ...otherRuns] = await Promise.all([
+  const [main, p] = await Promise.all([
     runCached(scenario),
     presets().catch(() => null),
-    ...others.map((g) => runCached(asGlass(g.key))),
   ])
-  const runFor = (gk) => (gk === scenario.glass ? main : otherRuns[others.findIndex((g) => g.key === gk)])
 
   const r = main.result
   const lastYear = r.years[r.years.length - 1]
@@ -148,6 +144,11 @@ export async function buildReportData(scenario, { project = '', runCached, prese
         const wfloor = scenario.wfloor ?? BUILDING_INPUT.wfloor
         return { floors, wfloor, changed: floors !== BUILDING_INPUT.floors || wfloor !== BUILDING_INPUT.wfloor, above_mid_ft: Math.round(heightAboveMidFt(floors, wfloor)) }
       })(),
+      // v2.10: building pressure in occupied hours (0 Pa when absent)
+      pressure: (() => {
+        const pa = scenario.pa ?? PRESSURE_INPUT.default
+        return { pa, text: formatPa(pa), changed: pa !== PRESSURE_INPUT.default, hours: `weekdays ${FIXED.occ_start_h} am to ${FIXED.occ_end_h - 12} pm` }
+      })(),
       // v2.8: room humidity mode, and the room RH the engine simulated over the heating season
       hum: HUMIDITY.find((x) => x.key === (scenario.hum ?? 'fixed')),
       room: r.room ?? null,
@@ -178,17 +179,15 @@ export async function buildReportData(scenario, { project = '', runCached, prese
       monthly_fog_days: monthlyFogDays(lastYear?.fog),
       working_hours: WORKING_HOURS,
     },
-    options: GLASSES.map((g) => {
-      const run = runFor(g.key)
-      return {
-        key: g.key,
-        label: g.label,
-        product: g.product,
-        selected: g.key === scenario.glass,
-        thermal: g.key === scenario.glass ? th : thermalOf(scenario.ex, g.key),
-        ...summaryOf(run.result),
-      }
-    }),
+    // v2.10: only the glass the user picked (was all three).
+    options: [{
+      key: glass.key,
+      label: glass.label,
+      product: glass.product,
+      selected: true,
+      thermal: th,
+      ...summaryOf(r),
+    }],
     month_names: MONTH_SHORT,
     hours_per_year: HOURS_PER_YEAR,
   }

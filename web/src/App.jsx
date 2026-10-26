@@ -6,7 +6,7 @@ import ReportDialog from './ReportDialog.jsx'
 import { fetchConfig, peek, queryOf, readUrlHours, readUrlScenario, runScenario, writeUrlScenario } from './api.js'
 import Assumptions from './Assumptions.jsx'
 import Cavity from './Cavity.jsx'
-import { AssemblyBar, BuildingField, DesiccantSlider, dewPointF, FacadeSwitch, OffsetField, RoomSliders, SealLadder, WindowSizeField } from './Controls.jsx'
+import { AssemblyBar, BuildingField, DesiccantSlider, dewPointF, FacadeSwitch, OffsetField, PressureSlider, RoomSliders, SealLadder, WindowSizeField } from './Controls.jsx'
 import FogCalendar, { Legend } from './FogCalendar.jsx'
 
 function ErrorPanel({ error, onRetry }) {
@@ -169,6 +169,7 @@ export default function App() {
               <WindowSizeField width={scenario.width} height={scenario.height} onChange={(patch) => update(patch)} />
               <FacadeSwitch value={scenario.facade} onChange={(k) => update({ facade: k })} />
               <BuildingField floors={scenario.floors} wfloor={scenario.wfloor} onChange={(patch) => update(patch)} />
+              <PressureSlider value={scenario.pa} onChange={(v) => update({ pa: v }, 'slider')} />
             </div>
           </div>
 

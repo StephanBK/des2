@@ -6,10 +6,12 @@
 // removed at Stephan's request 2026-10-15):
 //   1. summary      site, outlook, key numbers, configuration
 //   2. calendar     when the pane fogs, by hour and by month; desiccant
-//   3. options      the three retrofit glasses, site climate, how it works
+//   3. glass        the picked retrofit glass, site climate, how it works
 // Anas 2026-10-17: with 0 lb of desiccant the report never mentions
 // desiccant; the ENTERED note and tags, the U asterisk, the options footnotes,
 // the humidity headroom chart and every "clear up to X %" line are gone.
+// Stephan 2026-10-26 (v2.10): only the glass the user picked (no three-glass
+// strip or table), no "Reading the results" section, building pressure shown.
 //
 // The font has no arrows or comparison signs: text uses words for those.
 
@@ -232,7 +234,8 @@ function SummaryPage({ data }) {
         h(KV, { k: 'Weather data', v: 'NREL NSRDB typical year' }),
         h(KV, { k: 'Weather cell', v: cellText(data.site.weather_cell) }),
         h(KV, { k: 'Facade', v: `${cfg.facade.label}-facing` }),
-        h(KV, { k: 'Window', v: `${cfg.window.width} × ${cfg.window.height} in, ${cfg.building?.changed ? `floor ${cfg.building.wfloor} of ${cfg.building.floors}` : 'at mid-height'}` })),
+        h(KV, { k: 'Window', v: `${cfg.window.width} × ${cfg.window.height} in, ${cfg.building?.changed ? `floor ${cfg.building.wfloor} of ${cfg.building.floors}` : 'at mid-height'}` }),
+        h(KV, { k: 'Building pressure', v: `${cfg.pressure.text} HVAC, ${cfg.pressure.hours}` })),
       h(View, { style: { flex: 1 } },
         h(Text, { style: s.h3 }, 'Window assembly'),
         h(KV, { k: 'Existing glass', v: cfg.existing.label }),
@@ -253,20 +256,20 @@ function SummaryPage({ data }) {
     h(Footer, { data }))
 }
 
-// All three retrofit glasses in one strip, details on page 3.
+// The picked retrofit glass in one strip (v2.10: only that one), details on page 3.
 function Glance({ data }) {
+  const o = data.options.find((x) => x.selected)
   return h(View, { style: { marginTop: 13 }, wrap: false },
     h(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 } },
-      h(Text, { style: s.h3 }, 'All three INOVUES retrofit glasses at this site'),
+      h(Text, { style: s.h3 }, 'INOVUES retrofit glass at this site'),
       h(Text, { style: s.small }, 'Details on page 3')),
-    h(View, { style: { flexDirection: 'row', gap: 8 } },
-      ...data.options.map((o) => h(View, { key: o.key, style: { flex: 1, borderWidth: o.selected ? 1.2 : 0.6, borderColor: o.selected ? C.teal : C.line, borderRadius: 2, paddingVertical: 7, paddingHorizontal: 9, backgroundColor: o.selected ? C.tealSoft : C.surface } },
-        h(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-          h(View, { style: { width: 7, height: 7, borderRadius: 4, backgroundColor: GLASS_COLOR[o.key], marginRight: 5 } }),
-          h(Text, { style: { fontSize: 9, fontWeight: 600 } }, o.product),
-          h(Text, { style: { fontSize: 7.5, color: C.ink3, marginLeft: 4 } }, o.selected ? 'this report' : o.label)),
-        h(Text, { style: { fontSize: 13, fontWeight: 600, marginTop: 3, color: o.fog_days_per_year ? C.fogInk : C.tealInk } },
-          `${o.fog_days_per_year} fog ${o.fog_days_per_year === 1 ? 'day' : 'days'} a year`)))))
+    h(View, { style: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.2, borderColor: C.teal, borderRadius: 2, paddingVertical: 7, paddingHorizontal: 11, backgroundColor: C.tealSoft } },
+      h(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+        h(View, { style: { width: 7, height: 7, borderRadius: 4, backgroundColor: GLASS_COLOR[o.key], marginRight: 6 } }),
+        h(Text, { style: { fontSize: 10, fontWeight: 600 } }, o.product),
+        h(Text, { style: { fontSize: 8.5, color: C.ink2, marginLeft: 5 } }, o.label)),
+      h(Text, { style: { fontSize: 13, fontWeight: 600, color: o.fog_days_per_year ? C.fogInk : C.tealInk } },
+        `${o.fog_days_per_year} fog ${o.fog_days_per_year === 1 ? 'day' : 'days'} a year`)))
 }
 
 // ------------------------------------------------------------ page 2: calendar
@@ -383,16 +386,6 @@ function LoadingChart({ data, width, height }) {
   return h(Svg, { width, height, viewBox: `0 0 ${width} ${height}` }, ...els)
 }
 
-// What this year's fog looks like, in words that match the data above.
-function fogPattern(st, ws) {
-  const base = 'Fog forms when the cavity side of the existing glass is colder than the dew point of the air in the cavity, and clears as the glass warms.'
-  if (st.hours === 0) return 'In this year the cavity side of the existing glass never stays below the cavity air\'s dew point long enough to fog.'
-  if (st.longest >= 72) return `${base} Here, once it forms in winter it tends to stay: the longest unbroken event lasts ${formatDuration(st.longest)}, because the glass stays below that dew point for weeks.`
-  const share = ws.hours / st.hours
-  if (share < 0.25) return `${base} Most of it comes at night and early in the morning: only ${Math.round(share * 100)} % of fog hours fall in working hours.`
-  return `${base} ${Math.round(share * 100)} % of fog hours fall in working hours (which are 30 % of all hours).`
-}
-
 function CalendarPage({ data }) {
   const amount = data.headline.cards.find((c) => c.key === 'amount')
   const st = data.year.stats
@@ -435,19 +428,7 @@ function CalendarPage({ data }) {
         h(MonthBars, { values: data.year.monthly_fog_days, width: CW, height: 120 }),
         h(Text, { style: { ...s.small, marginTop: 4 } }, 'Days with at least one hour of visible fog, same year as above.')),
 
-    h(View, { style: { marginTop: 18, borderTopWidth: 0.6, borderTopColor: C.line, paddingTop: 10 } },
-      h(Text, { style: s.h3 }, 'Reading the results'),
-      h(Bullets, {
-        items: [
-          fogPattern(st, ws),
-          lb > 0
-            ? 'While the desiccant works, it keeps the cavity air dry. Once it is full, the cavity follows the outdoor and room air that leaks in through the seals, and the yearly pattern above repeats.'
-            : 'The cavity air follows the outdoor and room air that leaks in through the seals. Year 1 starts from a clean pane and dry cavity air, so the settled year 2 is reported.',
-          data.config.hum?.key === 'none'
-            ? 'Room humidity matters most. This building has no humidifier, so the room air carries the outdoor moisture plus what the occupants add: humid winter spells raise the dew point of the air that reaches the cavity, dry cold spells lower it.'
-            : 'Room humidity matters most: more moisture in the room air raises the dew point of the air that reaches the cavity, so fog days rise quickly with room RH.',
-        ],
-      })),
+    // "Reading the results" (heading and bullets) removed in v2.10 (Stephan 2026-10-26).
     h(Footer, { data }))
 }
 
@@ -479,7 +460,7 @@ function OptionsTable({ data }) {
         h(View, { style: { width: 7, height: 7, borderRadius: 4, backgroundColor: GLASS_COLOR[o.key], marginRight: 5 } }),
         h(View, null,
           h(Text, { style: { fontSize: 8.8, fontWeight: 600 } }, o.product),
-          h(Text, { style: { fontSize: 7, color: C.ink3 } }, o.selected ? `${o.label}, this report` : o.label))),
+          h(Text, { style: { fontSize: 7, color: C.ink3 } }, o.label))),
       cell('u', o.thermal.u_ip.toFixed(3)),
       cell('f', o.thermal.f_cold.toFixed(3)),
       withDesiccant ? cell('life', lifeText(o)) : null,
@@ -531,8 +512,8 @@ function OptionsPage({ data }) {
   const cl = data.site.climate || {}
   const lb = data.config.lb
   return h(Page, { size: 'LETTER', style: s.page },
-    h(TopBar, { data, title: 'Options and site climate' }),
-    h(SectionTitle, { lead: `The same site, existing ${data.config.existing.label.toLowerCase()}, seals${lb > 0 ? ', desiccant' : ''} and room air, with each INOVUES retrofit glass.` }, 'Retrofit glass options'),
+    h(TopBar, { data, title: 'Retrofit glass and site climate' }),
+    h(SectionTitle, { lead: `The INOVUES retrofit glass in this report, over the existing ${data.config.existing.label.toLowerCase()}, with the seals${lb > 0 ? ', desiccant' : ''} and room air on page 1.` }, 'Retrofit glass'),
     h(OptionsTable, { data }),
 
     h(View, { style: { marginTop: 18 }, wrap: false },

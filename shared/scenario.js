@@ -2,7 +2,7 @@
 // here, once. The server imports it to validate requests and build engine
 // calls; the web page imports it to draw the controls. Change it here only.
 
-export const APP_VERSION = '2.9.0'
+export const APP_VERSION = '2.10.0'
 
 // Engine: INOVUES desiccant lifetime simulator (StephanBK/desiccant_life-).
 // Needs the 2026-09-23 fog-map API (fog_map, years_after_full) and, since
@@ -122,6 +122,20 @@ export const PEOPLE = { gkg: 1.2, fade_ach: 0.5 }
 // (11 floors, floor 10) the same report inputs give 53 fog days, not 7.
 export const BUILDING_INPUT = { min: 1, max: 100, floors: 20, wfloor: 10, floor_height_ft: 11.81 }
 
+// v2.10 (Stephan 2026-10-26): the HVAC building pressure in occupied hours
+// (weekdays 7 am to 7 pm) is an input, 0 Pa by default (was fixed at +2 Pa
+// in v2.9, +5 before), -10 to +10 Pa in steps of 2. Positive: the building
+// is pressurized and pushes room air into the cavity. Negative: the building
+// is under-pressurized and draws outdoor air in through the cavity. Outside
+// occupied hours it stays 0 Pa; stack and wind act on top either way. At
+// 0 Pa it stays out of links, cache keys and report ids.
+export const PRESSURE_INPUT = { min: -10, max: 10, step: 2, default: 0 }
+
+/** Pressure as shown: a sign on every non-zero value ("+4 Pa", "0 Pa", "-4 Pa" with a true minus). */
+export function formatPa(pa) {
+  return `${pa > 0 ? '+' : pa < 0 ? '−' : ''}${Math.abs(pa)} Pa`
+}
+
 /** Height of the window above the building's neutral plane (mid-height), in feet; negative below it. */
 export function heightAboveMidFt(floors, wfloor) {
   return (wfloor - 0.5 - floors / 2) * BUILDING_INPUT.floor_height_ft
@@ -179,21 +193,22 @@ export const SITE_TOL_DEG = 0.02            // about 2 km, the size of one weath
 // A known address for tests and examples only; never pre-filled on the page.
 export const EXAMPLE_SITE = { addr: '350 Fifth Avenue, New York, New York 10118, United States', lat: 40.74844, lon: -73.98566 }
 
-export const DEFAULTS = { ex: 'single', glass: 'vig', u: null, offset: OFFSET_INPUT.default, facade: 'north', width: WINDOW_INPUT.width, height: WINDOW_INPUT.height, floors: BUILDING_INPUT.floors, wfloor: BUILDING_INPUT.wfloor, seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, hum: 'fixed', addr: '', lat: null, lon: null }
+export const DEFAULTS = { ex: 'single', glass: 'vig', u: null, offset: OFFSET_INPUT.default, facade: 'north', width: WINDOW_INPUT.width, height: WINDOW_INPUT.height, floors: BUILDING_INPUT.floors, wfloor: BUILDING_INPUT.wfloor, pa: PRESSURE_INPUT.default, seal_out: 'wet_sealed', seal_in: 'wet_sealed', lb: 0, t: 70, rh: 30, hum: 'fixed', addr: '', lat: null, lon: null }
 
 // Every hidden engine input is pinned explicitly (not left to engine
 // defaults), so an engine default change cannot move these results, and
 // every one of them is checked against the engine's echo.
 // orientation, width_in, height_in (v2.7), offset_in (v2.6), floors,
-// window_floor and room_humidity (v2.8) come from the scenario, not from here.
+// window_floor and room_humidity (v2.8) and p_occ_pa (v2.10) come from the
+// scenario, not from here.
 export const FIXED = {
   r_ip: 0.97,                 // f_cold and u_ip come from THERMAL, not fixed
   desiccant: 'ms3a',
   desorption: true,
   absorptance: 0.1,
-  // v2.9 (2026-10-25): +2 Pa occupied (was +5), the 1 to 2 Pa measured in
-  // existing buildings.
-  p_occ_pa: 2, p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
+  // Occupied-hours pressure p_occ_pa is the scenario's pa (v2.10); the
+  // schedule and the unoccupied 0 Pa stay fixed.
+  p_unocc_pa: 0, occ_start_h: 7, occ_end_h: 19, weekdays_only: true,
   sealant_out: 'silicone', sealant_in: 'silicone',
   max_years: 20,
   // v2.8: the full theoretical stack pressure (as before), and the office
@@ -225,7 +240,7 @@ export const FIXED_DESCRIPTION = [
   ['Start', 'Installation on January 1 with a fresh desiccant.'],
   ['Desiccant', '3A molecular sieve. It can release water again when warm (desorption on).'],
   ['Sealant', 'Silicone beads on both layers; water vapor slowly diffuses through them.'],
-  ['Building pressure', '+2 Pa on weekdays 7 am to 7 pm, 0 Pa otherwise, plus stack and wind. Measurements in existing buildings find 1 to 2 Pa.'],
+  ['Building pressure', 'An input, 0 Pa unless changed (-10 to +10 Pa). It applies on weekdays 7 am to 7 pm; 0 Pa otherwise. Stack and wind act on top. Positive means the building pushes room air out through the windows; negative means it draws outdoor air in. Measurements in existing buildings find 1 to 2 Pa.'],
   ['Surroundings', 'A window on a city street: it sees sky only above the buildings across the street (35 % of its view; an open field would be 50 %).'],
   ['Room air', 'Fixed RH: the set relative humidity every hour. No humidification: the outdoor air\'s moisture plus the occupants\' (office: 1.2 g of water per kg of air while occupied, weekdays 7 am to 7 pm, fading after hours), at most 60 % RH when it is warm outdoors.'],
 ]

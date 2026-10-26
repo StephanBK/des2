@@ -1,14 +1,14 @@
 // The page's side of /api/run and /api/config.
 
-import { ADDRESS, BUILDING_INPUT, DEFAULTS, EXISTING, FACADES, GLASSES, HUMIDITY, normalizeU, OFFSET_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, U_INPUT, WINDOW_INPUT } from '../../shared/scenario.js'
+import { ADDRESS, BUILDING_INPUT, DEFAULTS, EXISTING, FACADES, GLASSES, HUMIDITY, normalizeU, OFFSET_INPUT, PRESSURE_INPUT, RANGES, SEALS_EXISTING, SEALS_RETROFIT, U_INPUT, WINDOW_INPUT } from '../../shared/scenario.js'
 
-const ORDER = ['ex', 'glass', 'u', 'offset', 'facade', 'width', 'height', 'floors', 'wfloor', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'hum', 'addr', 'lat', 'lon']
+const ORDER = ['ex', 'glass', 'u', 'offset', 'facade', 'width', 'height', 'floors', 'wfloor', 'pa', 'seal_out', 'seal_in', 'lb', 't', 'rh', 'hum', 'addr', 'lat', 'lon']
 
 // Optional controls left out of links (and the server's cache key) at their
-// default, so links from before v2.6 / v2.7 / v2.8 stay the same.
+// default, so links from before v2.6 / v2.7 / v2.8 / v2.10 stay the same.
 const LINK_DEFAULTS = {
   offset: OFFSET_INPUT.default, facade: DEFAULTS.facade, width: DEFAULTS.width, height: DEFAULTS.height,
-  floors: DEFAULTS.floors, wfloor: DEFAULTS.wfloor, hum: DEFAULTS.hum,
+  floors: DEFAULTS.floors, wfloor: DEFAULTS.wfloor, pa: DEFAULTS.pa, hum: DEFAULTS.hum,
 }
 
 export class ApiError extends Error {
@@ -117,6 +117,15 @@ export function parseFloor(raw, max = BUILDING_INPUT.max) {
   return v >= BUILDING_INPUT.min && v <= max ? v : null
 }
 
+/** Building pressure from the address bar (v2.10): a whole number of Pa, -10 to +10 in steps of 2; else 0. */
+export function parsePa(raw) {
+  const t = String(raw ?? '').trim()
+  if (!/^-?\d{1,2}$/.test(t)) return PRESSURE_INPUT.default
+  const v = Number(t) || 0
+  const { min, max, step } = PRESSURE_INPUT
+  return v >= min && v <= max && (v - min) % step === 0 ? v : PRESSURE_INPUT.default
+}
+
 /** Floors and window floor from the address bar; a window floor above the floors falls back to the defaults. */
 function urlBuilding(p) {
   const floors = parseFloor(p.get('floors')) ?? DEFAULTS.floors
@@ -153,6 +162,7 @@ export function readUrlScenario(search = window.location.search) {
     width: parseWindowSide(p.get('width')) ?? DEFAULTS.width,
     height: parseWindowSide(p.get('height')) ?? DEFAULTS.height,
     ...urlBuilding(p),
+    pa: parsePa(p.get('pa')),
     seal_out: pick(p.get('seal_out'), SEALS_EXISTING, DEFAULTS.seal_out),
     seal_in: pick(p.get('seal_in'), SEALS_RETROFIT, DEFAULTS.seal_in),
     lb: num(p.get('lb'), RANGES.lb, DEFAULTS.lb),

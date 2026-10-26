@@ -86,16 +86,16 @@ async function start(t, opts = {}) {
 
 const qs = (o = {}) => new URLSearchParams(Object.entries({ ...BASE, ...o }).filter(([, v]) => v !== null).map(([k, v]) => [k, String(v)])).toString()
 
-test('report data: three glasses, no humidity sweeps (switched off 2026-10-17), site, a link that reopens the scenario', async (t) => {
+test('report data: only the picked glass (v2.10), no humidity sweeps (switched off 2026-10-17), site, a link that reopens the scenario', async (t) => {
   const s = await start(t)
   const r = await s.get(`/api/report.json?${qs({ glass: 'double' })}&project=Lobby`)
   assert.equal(r.status, 200, JSON.stringify(r.json))
   const d = r.json
   assert.equal(d.project, 'Lobby')
-  assert.deepEqual(d.options.map((o) => [o.key, o.selected]), [['single', false], ['double', true], ['vig', false]])
+  assert.deepEqual(d.options.map((o) => [o.key, o.selected]), [['double', true]], 'only the picked glass')
   assert.ok(d.options.every((o) => !('headroom' in o) && !('sweep' in o)), 'no headroom data in the report')
   assert.equal('rh_levels' in d, false)
-  assert.equal(d.options[1].thermal.u_ip, 0.249)
+  assert.equal(d.options[0].thermal.u_ip, 0.249)
   assert.equal(d.config.glass.product, 'SWR-IG')
   assert.equal(d.config.seal_out.cfm_ft2, 0.005)
   assert.equal(d.site.matched, BASE.addr)
@@ -106,15 +106,15 @@ test('report data: three glasses, no humidity sweeps (switched off 2026-10-17), 
   assert.equal(link.searchParams.get('glass'), 'double')
   assert.equal(link.searchParams.get('addr'), BASE.addr)
   assert.equal(link.searchParams.get('project'), null)
-  assert.equal(s.f.calls.lifetime, 3)
+  assert.equal(s.f.calls.lifetime, 1, 'one run: the scenario on screen, no other glasses')
   assert.equal(s.f.calls.sweep, 0, 'no humidity sweeps while the headroom is off')
   // a second report on the same inputs is all cache
   await s.get(`/api/report.json?${qs({ glass: 'double' })}&project=Lobby`)
-  assert.equal(s.f.calls.lifetime, 3)
+  assert.equal(s.f.calls.lifetime, 1)
   assert.equal(s.f.calls.sweep, 0)
 })
 
-test('report with a typed U: the chosen glass uses it, the other two keep their standard U', async (t) => {
+test('report with a typed U: the picked glass uses it, and no other glass is run', async (t) => {
   const s = await start(t)
   const r = await s.get(`/api/report.json?${qs({ ex: 'double', glass: 'vig', u: '0.180' })}`)
   assert.equal(r.status, 200, JSON.stringify(r.json))
@@ -123,11 +123,7 @@ test('report with a typed U: the chosen glass uses it, the other two keep their 
   assert.equal(d.config.thermal.u_entered, true)
   assert.equal(d.config.thermal.u_estimate, false)
   assert.equal(d.config.thermal.u_table, 0.138)
-  const byKey = Object.fromEntries(d.options.map((o) => [o.key, o.thermal]))
-  assert.equal(byKey.vig.u_ip, 0.18)
-  assert.equal(byKey.single.u_ip, 0.249)
-  assert.equal(byKey.double.u_ip, 0.193)
-  assert.equal(byKey.single.u_entered, undefined)
+  assert.deepEqual(d.options.map((o) => [o.key, o.thermal.u_ip]), [['vig', 0.18]])
   // what the engine was actually sent: 0.180 only with the VIG f, never with another glass
   const vigF = '0.064'
   for (const u of s.f.calls.urls) {
@@ -135,6 +131,7 @@ test('report with a typed U: the chosen glass uses it, the other two keep their 
     if (sent === '0.18') assert.equal(u.searchParams.get('f_cold'), vigF, `${u.pathname}: typed U only for VIG`)
   }
   assert.equal(s.f.calls.urls.filter((u) => u.searchParams.get('u_ip') === '0.18').length, 1, 'the VIG run only')
+  assert.equal(s.f.calls.lifetime, 1, 'no runs for the other two glasses')
   assert.equal(new URL(d.link).searchParams.get('u'), '0.18', 'the link reopens the typed U')
 })
 
@@ -146,13 +143,13 @@ test('report PDF with a typed U still fits on 3 pages', async (t) => {
   assert.equal(pages, 3)
 })
 
-test('report with a changed offset: every glass uses it, the report says so', async (t) => {
+test('report with a changed offset: the run uses it, the report says so', async (t) => {
   const s = await start(t)
   const r = await s.get(`/api/report.json?${qs({ offset: '1.5' })}`)
   assert.equal(r.status, 200, JSON.stringify(r.json))
   assert.deepEqual(r.json.config.offset, { inches: 1.5, standard: 0.6, changed: true })
   const engineCalls = s.f.calls.urls.filter((u) => u.searchParams.has('offset_in'))
-  assert.equal(engineCalls.length, 3, '3 runs, no sweeps')
+  assert.equal(engineCalls.length, 1, '1 run, no sweeps')
   assert.ok(engineCalls.every((u) => u.searchParams.get('offset_in') === '1.5'))
   assert.equal(new URL(r.json.link).searchParams.get('offset'), '1.5')
   const std = await s.get(`/api/report.json?${qs()}`)
@@ -160,14 +157,14 @@ test('report with a changed offset: every glass uses it, the report says so', as
   assert.equal(new URL(std.json.link).searchParams.has('offset'), false)
 })
 
-test('report with a facade and window size (v2.7): every glass uses them, the report shows them, the link reopens them', async (t) => {
+test('report with a facade and window size (v2.7): the run uses them, the report shows them, the link reopens them', async (t) => {
   const s = await start(t)
   const r = await s.get(`/api/report.json?${qs({ facade: 'south', width: '48', height: '120' })}`)
   assert.equal(r.status, 200, JSON.stringify(r.json))
   assert.deepEqual(r.json.config.facade, { key: 'south', label: 'South' })
   assert.deepEqual(r.json.config.window, { width: 48, height: 120 })
   const runs = s.f.calls.urls.filter((u) => u.pathname === '/api/lifetime')
-  assert.equal(runs.length, 3)
+  assert.equal(runs.length, 1)
   assert.ok(runs.every((u) => u.searchParams.get('orientation') === 'south' && u.searchParams.get('width_in') === '48' && u.searchParams.get('height_in') === '120'))
   const link = new URL(r.json.link).searchParams
   assert.deepEqual([link.get('facade'), link.get('width'), link.get('height')], ['south', '48', '120'])
@@ -274,7 +271,7 @@ test('method note: no desiccant at 0 lb, right article for each facade, 20-year 
 
 // ------------------------------------------------------------ v2.8: room humidity and building
 
-test('report with no humidification and a real building height: every glass uses them, the report and link carry them', async (t) => {
+test('report with no humidification and a real building height: the run uses them, the report and link carry them', async (t) => {
   const s = await start(t)
   const r = await s.get(`/api/report.json?${qs({ hum: 'none', floors: '11', wfloor: '10' })}`)
   assert.equal(r.status, 200, JSON.stringify(r.json))
@@ -282,7 +279,7 @@ test('report with no humidification and a real building height: every glass uses
   assert.deepEqual(r.json.config.building, { floors: 11, wfloor: 10, changed: true, above_mid_ft: 47 })
   assert.deepEqual(r.json.config.room, { median_pct: 18.0, p10_pct: 10.0, p90_pct: 31.0 })
   const runs = s.f.calls.urls.filter((u) => u.pathname === '/api/lifetime')
-  assert.equal(runs.length, 3)
+  assert.equal(runs.length, 1)
   assert.ok(runs.every((u) => u.searchParams.get('room_humidity') === 'unhumidified' && u.searchParams.get('floors') === '11' && u.searchParams.get('window_floor') === '10'))
   const link = new URL(r.json.link).searchParams
   assert.deepEqual([link.get('hum'), link.get('floors'), link.has('wfloor')], ['none', '11', false], 'floor 10 is the standard window floor')
@@ -301,7 +298,7 @@ test('report PDF without humidification: says so on every page that mentions roo
   assert.match(text, /no humidification; heating season about 18 % RH \(10 to 31 %\)/)
   assert.match(text, /30 × 14 in, floor 10 of 11/)
   assert.match(text, /Room air: the building has no humidifier/)
-  assert.match(text, /This building has no humidifier/)
+  assert.doesNotMatch(text, /Reading the results/, 'section removed in v2.10')
   assert.doesNotMatch(text, /dew point \d+ °F/, 'no fixed-RH dew point')
   assert.doesNotMatch(text, /desiccant/i)
   assert.equal((r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 3)
@@ -321,4 +318,42 @@ test('method note: a room-air line only without humidification', () => {
   const data = (hum) => ({ config: { lb: 0, facade: { key: 'north', label: 'North' }, hum: { key: hum }, people_gkg: 1.2 }, result: { max_years: 20 } })
   assert.doesNotMatch(methodItems(data('fixed')).join(' '), /humidifier/)
   assert.match(methodItems(data('none')).join(' '), /Room air: the building has no humidifier.*about 1\.2 g of water per kg/)
+})
+
+// ------------------------------------------------------------ v2.10: building pressure, one glass
+
+test('report with a building pressure (v2.10): the run uses it, the report shows it, the link reopens it; 0 Pa by default', async (t) => {
+  const s = await start(t)
+  const r = await s.get(`/api/report.json?${qs({ pa: '-6' })}`)
+  assert.equal(r.status, 200, JSON.stringify(r.json))
+  assert.deepEqual(r.json.config.pressure, { pa: -6, text: '−6 Pa', changed: true, hours: 'weekdays 7 am to 7 pm' })
+  const runs = s.f.calls.urls.filter((u) => u.pathname === '/api/lifetime')
+  assert.equal(runs.length, 1)
+  assert.equal(runs[0].searchParams.get('p_occ_pa'), '-6')
+  assert.equal(runs[0].searchParams.get('p_unocc_pa'), '0')
+  assert.equal(new URL(r.json.link).searchParams.get('pa'), '-6')
+  const std = await s.get(`/api/report.json?${qs()}`)
+  assert.deepEqual(std.json.config.pressure, { pa: 0, text: '0 Pa', changed: false, hours: 'weekdays 7 am to 7 pm' })
+  assert.equal(new URL(std.json.link).searchParams.has('pa'), false, '0 Pa stays out of the link')
+  const sent0 = s.f.calls.urls.filter((u) => u.pathname === '/api/lifetime').at(-1)
+  assert.equal(sent0.searchParams.get('p_occ_pa'), '0')
+})
+
+test('report PDF (v2.10): only the picked glass, no "Reading the results", building pressure shown; 3 pages', { skip: !hasPdftotext && 'pdftotext not installed' }, async (t) => {
+  const s = await start(t)
+  // A product name on its own: "SWR" but not "SWR-IG", "SWR-VIG" or the title "SWR Condensation Assessment".
+  const named = (text, product) => new RegExp(`(^|[^-\\w])${product}(?![-\\w]| Condensation)`).test(text)
+  for (const [glass, product, others] of [['vig', 'SWR-VIG', ['SWR-IG', 'SWR']], ['double', 'SWR-IG', ['SWR-VIG', 'SWR']], ['single', 'SWR', ['SWR-IG', 'SWR-VIG']]]) {
+    const r = await s.get(`/api/report?${qs({ glass, pa: '4' })}`)
+    assert.equal(r.status, 200)
+    const text = pdfText(r.body).replace(/\s+/g, ' ')
+    assert.match(text, new RegExp(`INOVUES retrofit glass at this site`))
+    assert.ok(named(text, product), `${glass}: ${product} named`)
+    for (const o of others) assert.ok(!named(text, o), `${glass}: no ${o} anywhere in the report`)
+    assert.doesNotMatch(text, /All three/i)
+    assert.doesNotMatch(text, /Reading the results/)
+    assert.doesNotMatch(text, /, this report|SWR[-A-Z]* this report/, 'no "this report" glass marker with only one glass')
+    assert.match(text, /Building pressure \+4 Pa HVAC, weekdays 7 am to 7 pm/)
+    assert.equal((r.body.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 3)
+  }
 })
